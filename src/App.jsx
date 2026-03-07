@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
-import { uid, todayStr, formatDate, dayDiff, loadContacts, saveContacts, parseCSVLine } from './utils'
+import { uid, todayStr, formatDate, dayDiff, loadContacts, saveContacts, loadOrgs, saveOrgs, parseCSVLine } from './utils'
 
 const SECTORS = ['Teknoloji','Finans','Sağlık','Eğitim & Akademi','Enerji','Hukuk','Medya & İletişim','Danışmanlık','Gayrimenkul','Üretim & Sanayi','Sivil Toplum','Kamu & Diplomasi','Diğer']
 const REL_TYPES = ['Müşteri','Partner','Mentor','Meslektaş','Yatırımcı','Tedarikçi','Akademisyen','Eski İş Arkadaşı','Arkadaş','Potansiyel Müşteri','Diğer']
+const ORG_TYPES = ['Şirket','Üniversite','Araştırma Enstitüsü','STK / Vakıf','Kamu Kurumu','Uluslararası Kuruluş','Girişim','Yatırım Fonu','Medya Kuruluşu','Diğer']
 const COMM_TYPES = { email:'📧', meeting:'🤝', call:'📞', linkedin:'💼', other:'💬' }
 const COMM_TYPE_LABELS = { email:'E-posta', meeting:'Toplantı', call:'Telefon', linkedin:'LinkedIn', other:'Diğer' }
 const PRIORITY_LABELS = { high:'Yüksek', medium:'Orta', low:'Düşük' }
@@ -12,10 +13,17 @@ const emptyForm = () => ({
   firstName:'', lastName:'', company:'', position:'', country:'', city:'',
   email:'', phone:'', linkedin:'', website:'',
   sector:'', relType:'', priority:'medium', tags:'',
-  lastContact:'', nextFollowup:'', notes:'', opportunities:''
+  lastContact:'', nextFollowup:'', notes:'', opportunities:'',
+  orgId:''
 })
 
-function StatsBar({ contacts }) {
+const emptyOrgForm = () => ({
+  name:'', type:'', sector:'', country:'', city:'',
+  website:'', phone:'', email:'', notes:''
+})
+
+/* ─── StatsBar ─── */
+function StatsBar({ contacts, orgs }) {
   const countries = new Set(contacts.map(c => c.country).filter(Boolean))
   const today = todayStr()
   const overdue = contacts.filter(c => c.nextFollowup && c.nextFollowup < today).length
@@ -23,6 +31,7 @@ function StatsBar({ contacts }) {
   return (
     <div className="stats-bar">
       <div className="stat-card"><div className="stat-icon blue">👥</div><div><div className="stat-label">Toplam Kişi</div><div className="stat-value">{contacts.length}</div></div></div>
+      <div className="stat-card"><div className="stat-icon purple">🏛</div><div><div className="stat-label">Toplam Kurum</div><div className="stat-value">{orgs.length}</div></div></div>
       <div className="stat-card"><div className="stat-icon green">🌍</div><div><div className="stat-label">Ülke Sayısı</div><div className="stat-value">{countries.size}</div></div></div>
       <div className="stat-card"><div className="stat-icon gold">⭐</div><div><div className="stat-label">Yüksek Öncelik</div><div className="stat-value">{highPri}</div></div></div>
       <div className="stat-card"><div className="stat-icon red">⏰</div><div><div className="stat-label">Takip Gereken</div><div className="stat-value">{overdue}</div></div></div>
@@ -30,6 +39,7 @@ function StatsBar({ contacts }) {
   )
 }
 
+/* ─── FollowupBanner ─── */
 function FollowupBanner({ contacts }) {
   const today = todayStr()
   const soon = new Date(); soon.setDate(soon.getDate() + 7)
@@ -49,9 +59,11 @@ function FollowupBanner({ contacts }) {
   )
 }
 
-function ContactCard({ c, onOpen, onEdit, onDelete }) {
+/* ─── ContactCard ─── */
+function ContactCard({ c, onOpen, onEdit, onDelete, orgs }) {
   const initials = (c.firstName?.[0]||'') + (c.lastName?.[0]||'')
   const today = todayStr()
+  const linkedOrg = orgs.find(o => o.id === c.orgId)
   let followupNote = null
   if (c.nextFollowup) {
     if (c.nextFollowup < today) followupNote = <span className="last-contact overdue">⚠ Takip gecikti: {formatDate(c.nextFollowup)}</span>
@@ -70,7 +82,10 @@ function ContactCard({ c, onOpen, onEdit, onDelete }) {
         <div style={{flex:1,minWidth:0}}>
           <div className="card-name">{c.firstName} {c.lastName}</div>
           {c.position && <div className="card-position">{c.position}</div>}
-          {c.company && <div className="card-company">🏢 {c.company}</div>}
+          {linkedOrg
+            ? <div className="card-company org-linked">🏛 {linkedOrg.name}</div>
+            : c.company && <div className="card-company">🏢 {c.company}</div>
+          }
         </div>
       </div>
       <div className="card-meta">
@@ -90,7 +105,39 @@ function ContactCard({ c, onOpen, onEdit, onDelete }) {
   )
 }
 
-function TableView({ list, onOpen, onEdit, onDelete }) {
+/* ─── OrgCard ─── */
+function OrgCard({ org, contacts, onOpen, onEdit, onDelete }) {
+  const linked = contacts.filter(c => c.orgId === org.id)
+  return (
+    <div className="org-card" onClick={() => onOpen(org.id)}>
+      <div className="card-header">
+        <div className="org-avatar">🏛</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div className="card-name">{org.name}</div>
+          {org.type && <div className="card-position">{org.type}</div>}
+          {org.city && org.country && <div className="card-company">📍 {org.city}, {org.country}</div>}
+        </div>
+      </div>
+      <div className="card-meta">
+        {org.sector && <span className="badge badge-sector">{org.sector}</span>}
+        {linked.length > 0 && <span className="badge badge-linked">👥 {linked.length} kişi</span>}
+      </div>
+      <div className="card-footer">
+        {org.website
+          ? <a href={org.website} target="_blank" rel="noreferrer" className="last-contact org-site" onClick={e=>e.stopPropagation()}>🌐 Web Sitesi</a>
+          : <span className="last-contact">{org.email || ''}</span>
+        }
+        <div className="card-actions" onClick={e => e.stopPropagation()}>
+          <button className="btn-icon edit" title="Düzenle" onClick={() => onEdit(org.id)}>✏️</button>
+          <button className="btn-icon danger" title="Sil" onClick={() => onDelete(org.id)}>🗑</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── TableView ─── */
+function TableView({ list, onOpen, onEdit, onDelete, orgs }) {
   const today = todayStr()
   if (!list.length) return <EmptyState/>
   return (
@@ -106,6 +153,7 @@ function TableView({ list, onOpen, onEdit, onDelete }) {
           {list.map(c => {
             const initials = (c.firstName?.[0]||'') + (c.lastName?.[0]||'')
             const isOverdue = c.nextFollowup && c.nextFollowup < today
+            const linkedOrg = orgs.find(o => o.id === c.orgId)
             return (
               <tr key={c.id}>
                 <td>
@@ -117,7 +165,7 @@ function TableView({ list, onOpen, onEdit, onDelete }) {
                     </div>
                   </div>
                 </td>
-                <td>{c.company||'—'}</td>
+                <td>{linkedOrg ? <span className="org-linked">🏛 {linkedOrg.name}</span> : (c.company||'—')}</td>
                 <td>{c.country||'—'}</td>
                 <td>{c.sector ? <span className="badge badge-sector">{c.sector}</span> : '—'}</td>
                 <td>{c.relType ? <span className="badge badge-rel">{c.relType}</span> : '—'}</td>
@@ -141,17 +189,62 @@ function TableView({ list, onOpen, onEdit, onDelete }) {
   )
 }
 
-function EmptyState() {
+/* ─── OrgTableView ─── */
+function OrgTableView({ list, contacts, onOpen, onEdit, onDelete }) {
+  if (!list.length) return <EmptyState type="org"/>
   return (
-    <div className="empty-state">
-      <div className="empty-icon">🔍</div>
-      <h3>Kişi bulunamadı</h3>
-      <p>Arama kriterlerinizi değiştirmeyi ya da yeni kişi eklemeyi deneyin.</p>
+    <div className="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Kurum Adı</th><th>Tür</th><th>Sektör</th><th>Ülke</th><th>Bağlı Kişi</th><th>İletişim</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map(org => {
+            const linked = contacts.filter(c => c.orgId === org.id)
+            return (
+              <tr key={org.id}>
+                <td>
+                  <div className="table-name" onClick={()=>onOpen(org.id)} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                    <span style={{fontSize:16}}>🏛</span> {org.name}
+                  </div>
+                </td>
+                <td>{org.type||'—'}</td>
+                <td>{org.sector ? <span className="badge badge-sector">{org.sector}</span> : '—'}</td>
+                <td>{org.country||'—'}</td>
+                <td>{linked.length > 0 ? <span className="badge badge-linked">👥 {linked.length}</span> : '—'}</td>
+                <td style={{fontSize:'12.5px'}}>
+                  {org.email ? <a href={`mailto:${org.email}`} style={{color:'var(--blue)'}}>{org.email}</a> : org.website ? <a href={org.website} target="_blank" rel="noreferrer" style={{color:'var(--blue)'}}>Web ↗</a> : '—'}
+                </td>
+                <td>
+                  <div style={{display:'flex',gap:'4px'}}>
+                    <button className="btn-icon edit" onClick={()=>onEdit(org.id)}>✏️</button>
+                    <button className="btn-icon danger" onClick={()=>onDelete(org.id)}>🗑</button>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }
 
-function FormModal({ isOpen, editContact, onClose, onSave }) {
+/* ─── EmptyState ─── */
+function EmptyState({ type }) {
+  return (
+    <div className="empty-state">
+      <div className="empty-icon">{type === 'org' ? '🏛' : '🔍'}</div>
+      <h3>{type === 'org' ? 'Kurum bulunamadı' : 'Kişi bulunamadı'}</h3>
+      <p>{type === 'org' ? 'Yeni kurum eklemek için "+ Kurum Ekle" butonunu kullanın.' : 'Arama kriterlerinizi değiştirmeyi ya da yeni kişi eklemeyi deneyin.'}</p>
+    </div>
+  )
+}
+
+/* ─── FormModal (contact) ─── */
+function FormModal({ isOpen, editContact, orgs, onClose, onSave }) {
   const [form, setForm] = useState(emptyForm())
   useEffect(() => {
     if (editContact) {
@@ -164,7 +257,8 @@ function FormModal({ isOpen, editContact, onClose, onSave }) {
         sector: editContact.sector||'', relType: editContact.relType||'',
         priority: editContact.priority||'medium', tags: (editContact.tags||[]).join(', '),
         lastContact: editContact.lastContact||'', nextFollowup: editContact.nextFollowup||'',
-        notes: editContact.notes||'', opportunities: editContact.opportunities||''
+        notes: editContact.notes||'', opportunities: editContact.opportunities||'',
+        orgId: editContact.orgId||''
       })
     } else {
       setForm(emptyForm())
@@ -197,8 +291,8 @@ function FormModal({ isOpen, editContact, onClose, onSave }) {
             <div className="form-grid">
               <div className="form-group"><label>Ad *</label><input className="form-control" value={form.firstName} onChange={e=>set('firstName',e.target.value)} placeholder="Adı"/></div>
               <div className="form-group"><label>Soyad *</label><input className="form-control" value={form.lastName} onChange={e=>set('lastName',e.target.value)} placeholder="Soyadı"/></div>
-              <div className="form-group"><label>Kurum / şirket</label><input className="form-control" value={form.company} onChange={e=>set('company',e.target.value)} placeholder="şirket veya kurum adı"/></div>
               <div className="form-group"><label>Pozisyon / Unvan</label><input className="form-control" value={form.position} onChange={e=>set('position',e.target.value)} placeholder="Örn. CEO, Research Director"/></div>
+              <div className="form-group"><label>Kurum / Şirket (serbest metin)</label><input className="form-control" value={form.company} onChange={e=>set('company',e.target.value)} placeholder="Şirket veya kurum adı"/></div>
               <div className="form-group"><label>Ülke</label><input className="form-control" value={form.country} onChange={e=>set('country',e.target.value)} placeholder="Örn. Almanya, ABD"/></div>
               <div className="form-group"><label>Şehir</label><input className="form-control" value={form.city} onChange={e=>set('city',e.target.value)} placeholder="Şehir"/></div>
               <div className="form-group"><label>E-posta</label><input type="email" className="form-control" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="ornek@sirket.com"/></div>
@@ -207,6 +301,21 @@ function FormModal({ isOpen, editContact, onClose, onSave }) {
               <div className="form-group"><label>Web Sitesi</label><input type="url" className="form-control" value={form.website} onChange={e=>set('website',e.target.value)} placeholder="https://..."/></div>
             </div>
           </div>
+
+          {orgs.length > 0 && (
+            <div className="form-section">
+              <div className="form-section-title">🏛 Kurum Bağlantısı</div>
+              <div className="form-group">
+                <label>Kayıtlı Kurumla Eşleştir</label>
+                <select className="form-control" value={form.orgId} onChange={e=>set('orgId',e.target.value)}>
+                  <option value="">— Kurum seçin (opsiyonel) —</option>
+                  {orgs.map(o=><option key={o.id} value={o.id}>{o.name}{o.type ? ` · ${o.type}` : ''}</option>)}
+                </select>
+                <span style={{fontSize:11.5,color:'var(--gray-400)',marginTop:3}}>Kurum kaydıyla bağlantı kurarak detay sayfalarında çift yönlü erişim sağlayın.</span>
+              </div>
+            </div>
+          )}
+
           <div className="form-section">
             <div className="form-section-title">🏷️ Kategori & Etiketler</div>
             <div className="form-grid cols3">
@@ -256,7 +365,101 @@ function FormModal({ isOpen, editContact, onClose, onSave }) {
   )
 }
 
-function DetailModal({ isOpen, contact, onClose, onEdit, onAddComm, onDeleteComm }) {
+/* ─── OrgFormModal ─── */
+function OrgFormModal({ isOpen, editOrg, onClose, onSave }) {
+  const [form, setForm] = useState(emptyOrgForm())
+  useEffect(() => {
+    if (editOrg) {
+      setForm({
+        name: editOrg.name||'', type: editOrg.type||'', sector: editOrg.sector||'',
+        country: editOrg.country||'', city: editOrg.city||'',
+        website: editOrg.website||'', phone: editOrg.phone||'',
+        email: editOrg.email||'', notes: editOrg.notes||''
+      })
+    } else {
+      setForm(emptyOrgForm())
+    }
+  }, [editOrg, isOpen])
+
+  useEffect(() => {
+    const handleKey = e => { if (e.key === 'Escape') onClose() }
+    if (isOpen) window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+  const set = (k, v) => setForm(f => ({...f, [k]: v}))
+  const handleSave = () => {
+    if (!form.name.trim()) { alert('Kurum adı zorunludur.'); return; }
+    onSave(form)
+  }
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <span className="modal-title">{editOrg ? '✏️ Kurumu Düzenle' : '🏛 Yeni Kurum'}</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-section">
+            <div className="form-section-title">🏛 Kurum Bilgileri</div>
+            <div className="form-grid">
+              <div className="form-group full">
+                <label>Kurum Adı *</label>
+                <input className="form-control" value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Kurum adı"/>
+              </div>
+              <div className="form-group">
+                <label>Kurum Türü</label>
+                <select className="form-control" value={form.type} onChange={e=>set('type',e.target.value)}>
+                  <option value="">Seçin</option>
+                  {ORG_TYPES.map(t=><option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Sektör</label>
+                <select className="form-control" value={form.sector} onChange={e=>set('sector',e.target.value)}>
+                  <option value="">Seçin</option>
+                  {SECTORS.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Ülke</label>
+                <input className="form-control" value={form.country} onChange={e=>set('country',e.target.value)} placeholder="Örn. Almanya, ABD"/>
+              </div>
+              <div className="form-group">
+                <label>Şehir</label>
+                <input className="form-control" value={form.city} onChange={e=>set('city',e.target.value)} placeholder="Şehir"/>
+              </div>
+              <div className="form-group">
+                <label>Web Sitesi</label>
+                <input type="url" className="form-control" value={form.website} onChange={e=>set('website',e.target.value)} placeholder="https://..."/>
+              </div>
+              <div className="form-group">
+                <label>Telefon</label>
+                <input className="form-control" value={form.phone} onChange={e=>set('phone',e.target.value)} placeholder="+90 212 ..."/>
+              </div>
+              <div className="form-group full">
+                <label>E-posta</label>
+                <input type="email" className="form-control" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="info@kurum.com"/>
+              </div>
+              <div className="form-group full">
+                <label>Notlar</label>
+                <textarea className="form-control" value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="Kurum hakkında notlarınız…"/>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>İptal</button>
+          <button className="btn btn-primary" onClick={handleSave}>💾 Kaydet</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── DetailModal (contact) ─── */
+function DetailModal({ isOpen, contact, orgs, onClose, onEdit, onAddComm, onDeleteComm, onOpenOrg }) {
   const [newDate, setNewDate] = useState(todayStr())
   const [newType, setNewType] = useState('email')
   const [newNote, setNewNote] = useState('')
@@ -270,6 +473,7 @@ function DetailModal({ isOpen, contact, onClose, onEdit, onAddComm, onDeleteComm
   const c = contact
   const initials = (c.firstName?.[0]||'') + (c.lastName?.[0]||'')
   const today = todayStr()
+  const linkedOrg = orgs.find(o => o.id === c.orgId)
   const handleAddComm = () => {
     if (!newDate || !newNote.trim()) { alert('Lütfen tarih ve not girin.'); return; }
     onAddComm(c.id, { id: uid(), date: newDate, type: newType, note: newNote.trim() })
@@ -284,7 +488,7 @@ function DetailModal({ isOpen, contact, onClose, onEdit, onAddComm, onDeleteComm
             <div className="detail-avatar">{initials}</div>
             <div className="detail-hero-info">
               <h2>{c.firstName} {c.lastName}</h2>
-              <p>{c.position}{c.position && c.company ? ' · ' : ''}{c.company}</p>
+              <p>{c.position}{c.position && (linkedOrg?.name || c.company) ? ' · ' : ''}{linkedOrg?.name || c.company}</p>
               {c.country && <div className="detail-company">📍 {c.country}{c.city ? ', ' + c.city : ''}</div>}
               <div className="detail-badges" style={{marginTop:10}}>
                 {c.sector && <span className="badge badge-sector">{c.sector}</span>}
@@ -301,6 +505,19 @@ function DetailModal({ isOpen, contact, onClose, onEdit, onAddComm, onDeleteComm
           </div>
         </div>
         <div className="modal-body">
+          {linkedOrg && (
+            <div className="detail-section">
+              <div className="detail-section-title">🏛 Bağlı Kurum</div>
+              <div className="org-link-card" onClick={()=>{onClose();onOpenOrg(linkedOrg.id)}}>
+                <span className="org-link-icon">🏛</span>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:14}}>{linkedOrg.name}</div>
+                  {linkedOrg.type && <div style={{fontSize:12,color:'var(--gray-500)'}}>{linkedOrg.type}{linkedOrg.sector ? ' · ' + linkedOrg.sector : ''}</div>}
+                </div>
+                <span style={{fontSize:12,color:'var(--blue)'}}>Görüntüle →</span>
+              </div>
+            </div>
+          )}
           <div className="detail-section">
             <div className="detail-section-title">📬 İletişim Bilgileri</div>
             <div className="info-grid">
@@ -370,7 +587,80 @@ function DetailModal({ isOpen, contact, onClose, onEdit, onAddComm, onDeleteComm
   )
 }
 
-function DeleteModal({ isOpen, contactName, onClose, onConfirm }) {
+/* ─── OrgDetailModal ─── */
+function OrgDetailModal({ isOpen, org, contacts, onClose, onEdit, onOpenContact }) {
+  useEffect(() => {
+    const handleKey = e => { if (e.key === 'Escape') onClose() }
+    if (isOpen) window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [isOpen, onClose])
+  if (!isOpen || !org) return null
+  const linked = contacts.filter(c => c.orgId === org.id)
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+        <div style={{position:'relative'}}>
+          <button className="modal-close" onClick={onClose} style={{position:'absolute',top:10,right:10,zIndex:10}}>✕</button>
+          <div className="detail-hero">
+            <div className="org-detail-avatar">🏛</div>
+            <div className="detail-hero-info">
+              <h2>{org.name}</h2>
+              <p>{org.type}{org.type && org.sector ? ' · ' : ''}{org.sector}</p>
+              {org.country && <div className="detail-company">📍 {org.country}{org.city ? ', ' + org.city : ''}</div>}
+              <div className="detail-badges" style={{marginTop:10}}>
+                {org.type && <span className="badge badge-rel">{org.type}</span>}
+                {org.sector && <span className="badge badge-sector">{org.sector}</span>}
+                <span className="badge badge-linked">👥 {linked.length} kişi</span>
+              </div>
+            </div>
+            <div style={{alignSelf:'flex-start',marginTop:4}}>
+              <button className="btn btn-sm btn-gold" onClick={()=>{onClose();onEdit(org.id)}}>✏️ Düzenle</button>
+            </div>
+          </div>
+        </div>
+        <div className="modal-body">
+          {(org.email || org.phone || org.website) && (
+            <div className="detail-section">
+              <div className="detail-section-title">📬 İletişim Bilgileri</div>
+              <div className="info-grid">
+                {org.email && <div className="info-item"><div className="info-lbl">E-posta</div><div className="info-val"><a href={`mailto:${org.email}`}>{org.email}</a></div></div>}
+                {org.phone && <div className="info-item"><div className="info-lbl">Telefon</div><div className="info-val">{org.phone}</div></div>}
+                {org.website && <div className="info-item full"><div className="info-lbl">Web Sitesi</div><div className="info-val"><a href={org.website} target="_blank" rel="noreferrer">{org.website} ↗</a></div></div>}
+              </div>
+            </div>
+          )}
+          <div className="detail-section">
+            <div className="detail-section-title">👥 Bağlı Kişiler ({linked.length})</div>
+            {linked.length === 0 ? (
+              <p style={{fontSize:13,color:'var(--gray-400)'}}>Bu kuruma bağlı kişi yok. Kişi eklerken bu kurumu seçerek bağlantı kurabilirsiniz.</p>
+            ) : (
+              <div className="linked-contacts">
+                {linked.map(c => (
+                  <div key={c.id} className="linked-contact-item" onClick={()=>{onClose();onOpenContact(c.id)}}>
+                    <div className="avatar" style={{width:34,height:34,fontSize:13}}>{(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:600,fontSize:13,color:'var(--gray-800)'}}>{c.firstName} {c.lastName}</div>
+                      {c.position && <div style={{fontSize:12,color:'var(--gray-500)'}}>{c.position}</div>}
+                    </div>
+                    {c.relType && <span className="badge badge-rel">{c.relType}</span>}
+                    <span style={{fontSize:11,color:'var(--blue)'}}>→</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {org.notes && <div className="detail-section"><div className="detail-section-title">📝 Notlar</div><div className="note-box">{org.notes}</div></div>}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>Kapat</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── DeleteModal ─── */
+function DeleteModal({ isOpen, name, message, onClose, onConfirm }) {
   useEffect(() => {
     const handleKey = e => { if (e.key === 'Escape') onClose() }
     if (isOpen) window.addEventListener('keydown', handleKey)
@@ -381,11 +671,11 @@ function DeleteModal({ isOpen, contactName, onClose, onConfirm }) {
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal" style={{maxWidth:400}} onClick={e=>e.stopPropagation()}>
         <div className="modal-header">
-          <span className="modal-title">Kişiyi Sil</span>
+          <span className="modal-title">Sil</span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
-          <p style={{fontSize:14,color:'var(--gray-600)'}}>"{contactName}" adlı kişiyi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</p>
+          <p style={{fontSize:14,color:'var(--gray-600)'}}>{message || `"${name}" öğesini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}</p>
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose}>İptal</button>
@@ -396,8 +686,13 @@ function DeleteModal({ isOpen, contactName, onClose, onConfirm }) {
   )
 }
 
+/* ─── App ─── */
 export default function App() {
   const [contacts, setContacts] = useState(() => loadContacts())
+  const [orgs, setOrgs] = useState(() => loadOrgs())
+  const [activeTab, setActiveTab] = useState('contacts')
+
+  // contact states
   const [search, setSearch] = useState('')
   const [fCountry, setFCountry] = useState('')
   const [fSector, setFSector] = useState('')
@@ -410,19 +705,38 @@ export default function App() {
   const [deleteId, setDeleteId] = useState(null)
   const fileInputRef = useRef()
 
+  // org states
+  const [orgSearch, setOrgSearch] = useState('')
+  const [orgView, setOrgView] = useState('card')
+  const [orgFormOpen, setOrgFormOpen] = useState(false)
+  const [editOrgId, setEditOrgId] = useState(null)
+  const [detailOrgId, setDetailOrgId] = useState(null)
+  const [deleteOrgId, setDeleteOrgId] = useState(null)
+
   useEffect(() => { saveContacts(contacts) }, [contacts])
+  useEffect(() => { saveOrgs(orgs) }, [orgs])
 
   const filtered = contacts.filter(c => {
     const q = search.toLowerCase().trim()
     const fullName = `${c.firstName} ${c.lastName}`.toLowerCase()
+    const linkedOrg = orgs.find(o => o.id === c.orgId)
     const matchQ = !q || fullName.includes(q) || (c.company||'').toLowerCase().includes(q)
       || (c.country||'').toLowerCase().includes(q) || (c.position||'').toLowerCase().includes(q)
       || (c.tags||[]).some(t => t.toLowerCase().includes(q))
+      || (linkedOrg?.name||'').toLowerCase().includes(q)
     return matchQ
       && (!fCountry || c.country === fCountry)
       && (!fSector || c.sector === fSector)
       && (!fRelType || c.relType === fRelType)
       && (!fPriority || c.priority === fPriority)
+  })
+
+  const filteredOrgs = orgs.filter(o => {
+    const q = orgSearch.toLowerCase().trim()
+    return !q || (o.name||'').toLowerCase().includes(q)
+      || (o.type||'').toLowerCase().includes(q)
+      || (o.sector||'').toLowerCase().includes(q)
+      || (o.country||'').toLowerCase().includes(q)
   })
 
   const countries = [...new Set(contacts.map(c=>c.country).filter(Boolean))].sort()
@@ -437,6 +751,16 @@ export default function App() {
     }
     setFormOpen(false)
     setEditId(null)
+  }
+
+  const handleSaveOrg = (formData) => {
+    if (editOrgId) {
+      setOrgs(os => os.map(o => o.id === editOrgId ? {...o, ...formData} : o))
+    } else {
+      setOrgs(os => [...os, { id: uid(), ...formData, addedDate: todayStr() }])
+    }
+    setOrgFormOpen(false)
+    setEditOrgId(null)
   }
 
   const handleAddComm = (contactId, comm) => {
@@ -454,8 +778,16 @@ export default function App() {
 
   const handleDelete = () => {
     setContacts(cs => cs.filter(c => c.id !== deleteId))
-    setDeleteId(null)
     if (detailId === deleteId) setDetailId(null)
+    setDeleteId(null)
+  }
+
+  const handleDeleteOrg = () => {
+    // Clear orgId from linked contacts
+    setContacts(cs => cs.map(c => c.orgId === deleteOrgId ? {...c, orgId:''} : c))
+    setOrgs(os => os.filter(o => o.id !== deleteOrgId))
+    if (detailOrgId === deleteOrgId) setDetailOrgId(null)
+    setDeleteOrgId(null)
   }
 
   const exportCSV = () => {
@@ -491,7 +823,7 @@ export default function App() {
             tags: cols[13] ? cols[13].split(';').filter(Boolean) : [],
             lastContact: cols[14]||'', nextFollowup: cols[15]||'',
             notes: cols[16]||'', opportunities: cols[17]||'',
-            communications: [], addedDate: todayStr()
+            communications: [], addedDate: todayStr(), orgId:''
           })
         }
       }
@@ -507,6 +839,12 @@ export default function App() {
   const editContact = contacts.find(c => c.id === editId) || null
   const detailContact = contacts.find(c => c.id === detailId) || null
   const deleteContact = contacts.find(c => c.id === deleteId)
+  const editOrg = orgs.find(o => o.id === editOrgId) || null
+  const detailOrg = orgs.find(o => o.id === detailOrgId) || null
+  const deleteOrg = orgs.find(o => o.id === deleteOrgId)
+
+  const openContact = (id) => { setDetailId(id); setActiveTab('contacts') }
+  const openOrg = (id) => { setDetailOrgId(id); setActiveTab('orgs') }
 
   return (
     <>
@@ -514,65 +852,110 @@ export default function App() {
         <div className="navbar-brand"><span className="globe">🌐</span>Global <span>Network</span></div>
         <div className="search-wrap">
           <span className="search-icon">🔍</span>
-          <input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="İsim, şirket, ülke ara…"/>
+          {activeTab === 'contacts'
+            ? <input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="İsim, şirket, ülke ara…"/>
+            : <input type="text" value={orgSearch} onChange={e=>setOrgSearch(e.target.value)} placeholder="Kurum adı, tür, ülke ara…"/>
+          }
         </div>
         <div className="navbar-right">
-          <button className="btn-add-nav" onClick={()=>{setEditId(null);setFormOpen(true)}}>＋ Kişi Ekle</button>
+          {activeTab === 'contacts'
+            ? <button className="btn-add-nav" onClick={()=>{setEditId(null);setFormOpen(true)}}>＋ Kişi Ekle</button>
+            : <button className="btn-add-nav btn-add-org" onClick={()=>{setEditOrgId(null);setOrgFormOpen(true)}}>＋ Kurum Ekle</button>
+          }
         </div>
       </nav>
 
-      <StatsBar contacts={contacts}/>
+      <StatsBar contacts={contacts} orgs={orgs}/>
       <FollowupBanner contacts={contacts}/>
 
-      <div className="toolbar-extra">
-        <button className="btn-export" onClick={exportCSV}>⬇ CSV İndir</button>
-        <label className="btn-export" style={{cursor:'pointer'}}>
-          ⬆ CSV Yükle
-          <input ref={fileInputRef} type="file" accept=".csv" style={{display:'none'}} onChange={importCSV}/>
-        </label>
+      <div className="tab-bar">
+        <button className={`tab-btn${activeTab==='contacts'?' active':''}`} onClick={()=>setActiveTab('contacts')}>
+          👥 Kişiler <span className="tab-count">{contacts.length}</span>
+        </button>
+        <button className={`tab-btn${activeTab==='orgs'?' active':''}`} onClick={()=>setActiveTab('orgs')}>
+          🏛 Kurumlar <span className="tab-count">{orgs.length}</span>
+        </button>
       </div>
 
-      <div className="filters-bar">
-        <select className="filter-select" value={fCountry} onChange={e=>setFCountry(e.target.value)}>
-          <option value="">🌍 Ülke</option>
-          {countries.map(c=><option key={c} value={c}>{c}</option>)}
-        </select>
-        <select className="filter-select" value={fSector} onChange={e=>setFSector(e.target.value)}>
-          <option value="">🏢 Sektör</option>
-          {sectors.map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
-        <select className="filter-select" value={fRelType} onChange={e=>setFRelType(e.target.value)}>
-          <option value="">👥 İlişki Türü</option>
-          {relTypes.map(r=><option key={r} value={r}>{r}</option>)}
-        </select>
-        <select className="filter-select" value={fPriority} onChange={e=>setFPriority(e.target.value)}>
-          <option value="">⭐ Öncelik</option>
-          <option value="high">🔴 Yüksek</option>
-          <option value="medium">🔵 Orta</option>
-          <option value="low">⚪ Düşük</option>
-        </select>
-        <button className="filter-clear" onClick={()=>{setFCountry('');setFSector('');setFRelType('');setFPriority('');setSearch('')}}>✕ Temizle</button>
-        <span className="results-count">{filtered.length} kişi</span>
-        <div className="view-toggle">
-          <button className={`view-btn${view==='card'?' active':''}`} onClick={()=>setView('card')} title="Kart Görünümü">⊞</button>
-          <button className={`view-btn${view==='table'?' active':''}`} onClick={()=>setView('table')} title="Tablo Görünümü">☰</button>
-        </div>
-      </div>
+      {activeTab === 'contacts' && (
+        <>
+          <div className="toolbar-extra">
+            <button className="btn-export" onClick={exportCSV}>⬇ CSV İndir</button>
+            <label className="btn-export" style={{cursor:'pointer'}}>
+              ⬆ CSV Yükle
+              <input ref={fileInputRef} type="file" accept=".csv" style={{display:'none'}} onChange={importCSV}/>
+            </label>
+          </div>
 
-      <div className="main-content">
-        {view === 'card'
-          ? filtered.length === 0
-            ? <EmptyState/>
-            : <div className="cards-grid">
-                {filtered.map(c => <ContactCard key={c.id} c={c} onOpen={setDetailId} onEdit={id=>{setEditId(id);setFormOpen(true)}} onDelete={setDeleteId}/>)}
-              </div>
-          : <TableView list={filtered} onOpen={setDetailId} onEdit={id=>{setEditId(id);setFormOpen(true)}} onDelete={setDeleteId}/>
-        }
-      </div>
+          <div className="filters-bar">
+            <select className="filter-select" value={fCountry} onChange={e=>setFCountry(e.target.value)}>
+              <option value="">🌍 Ülke</option>
+              {countries.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="filter-select" value={fSector} onChange={e=>setFSector(e.target.value)}>
+              <option value="">🏢 Sektör</option>
+              {sectors.map(s=><option key={s} value={s}>{s}</option>)}
+            </select>
+            <select className="filter-select" value={fRelType} onChange={e=>setFRelType(e.target.value)}>
+              <option value="">👥 İlişki Türü</option>
+              {relTypes.map(r=><option key={r} value={r}>{r}</option>)}
+            </select>
+            <select className="filter-select" value={fPriority} onChange={e=>setFPriority(e.target.value)}>
+              <option value="">⭐ Öncelik</option>
+              <option value="high">🔴 Yüksek</option>
+              <option value="medium">🔵 Orta</option>
+              <option value="low">⚪ Düşük</option>
+            </select>
+            <button className="filter-clear" onClick={()=>{setFCountry('');setFSector('');setFRelType('');setFPriority('');setSearch('')}}>✕ Temizle</button>
+            <span className="results-count">{filtered.length} kişi</span>
+            <div className="view-toggle">
+              <button className={`view-btn${view==='card'?' active':''}`} onClick={()=>setView('card')} title="Kart Görünümü">⊞</button>
+              <button className={`view-btn${view==='table'?' active':''}`} onClick={()=>setView('table')} title="Tablo Görünümü">☰</button>
+            </div>
+          </div>
 
-      <FormModal isOpen={formOpen} editContact={editContact} onClose={()=>{setFormOpen(false);setEditId(null)}} onSave={handleSave}/>
-      <DetailModal isOpen={!!detailId} contact={detailContact} onClose={()=>setDetailId(null)} onEdit={id=>{setEditId(id);setFormOpen(true)}} onAddComm={handleAddComm} onDeleteComm={handleDeleteComm}/>
-      <DeleteModal isOpen={!!deleteId} contactName={deleteContact ? `${deleteContact.firstName} ${deleteContact.lastName}` : ''} onClose={()=>setDeleteId(null)} onConfirm={handleDelete}/>
+          <div className="main-content">
+            {view === 'card'
+              ? filtered.length === 0
+                ? <EmptyState/>
+                : <div className="cards-grid">
+                    {filtered.map(c => <ContactCard key={c.id} c={c} onOpen={setDetailId} onEdit={id=>{setEditId(id);setFormOpen(true)}} onDelete={setDeleteId} orgs={orgs}/>)}
+                  </div>
+              : <TableView list={filtered} onOpen={setDetailId} onEdit={id=>{setEditId(id);setFormOpen(true)}} onDelete={setDeleteId} orgs={orgs}/>
+            }
+          </div>
+        </>
+      )}
+
+      {activeTab === 'orgs' && (
+        <>
+          <div className="filters-bar">
+            <span className="results-count">{filteredOrgs.length} kurum</span>
+            <div className="view-toggle" style={{marginLeft:'auto'}}>
+              <button className={`view-btn${orgView==='card'?' active':''}`} onClick={()=>setOrgView('card')} title="Kart Görünümü">⊞</button>
+              <button className={`view-btn${orgView==='table'?' active':''}`} onClick={()=>setOrgView('table')} title="Tablo Görünümü">☰</button>
+            </div>
+          </div>
+
+          <div className="main-content">
+            {orgView === 'card'
+              ? filteredOrgs.length === 0
+                ? <EmptyState type="org"/>
+                : <div className="cards-grid">
+                    {filteredOrgs.map(o => <OrgCard key={o.id} org={o} contacts={contacts} onOpen={setDetailOrgId} onEdit={id=>{setEditOrgId(id);setOrgFormOpen(true)}} onDelete={setDeleteOrgId}/>)}
+                  </div>
+              : <OrgTableView list={filteredOrgs} contacts={contacts} onOpen={setDetailOrgId} onEdit={id=>{setEditOrgId(id);setOrgFormOpen(true)}} onDelete={setDeleteOrgId}/>
+            }
+          </div>
+        </>
+      )}
+
+      <FormModal isOpen={formOpen} editContact={editContact} orgs={orgs} onClose={()=>{setFormOpen(false);setEditId(null)}} onSave={handleSave}/>
+      <OrgFormModal isOpen={orgFormOpen} editOrg={editOrg} onClose={()=>{setOrgFormOpen(false);setEditOrgId(null)}} onSave={handleSaveOrg}/>
+      <DetailModal isOpen={!!detailId} contact={detailContact} orgs={orgs} onClose={()=>setDetailId(null)} onEdit={id=>{setEditId(id);setFormOpen(true)}} onAddComm={handleAddComm} onDeleteComm={handleDeleteComm} onOpenOrg={openOrg}/>
+      <OrgDetailModal isOpen={!!detailOrgId} org={detailOrg} contacts={contacts} onClose={()=>setDetailOrgId(null)} onEdit={id=>{setEditOrgId(id);setOrgFormOpen(true)}} onOpenContact={openContact}/>
+      <DeleteModal isOpen={!!deleteId} name={deleteContact ? `${deleteContact.firstName} ${deleteContact.lastName}` : ''} onClose={()=>setDeleteId(null)} onConfirm={handleDelete}/>
+      <DeleteModal isOpen={!!deleteOrgId} name={deleteOrg?.name||''} message={deleteOrg ? `"${deleteOrg.name}" kurumunu silmek istediğinize emin misiniz? Bu kuruma bağlı kişilerin bağlantısı kaldırılacak, ancak kişiler silinmeyecek.` : ''} onClose={()=>setDeleteOrgId(null)} onConfirm={handleDeleteOrg}/>
     </>
   )
 }
