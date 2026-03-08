@@ -1232,6 +1232,115 @@ function TaskItem({ task, contacts, orgs, events, onToggle, onEdit, onDelete, on
   )
 }
 
+/* ─── AutoLinkModal ─── */
+function AutoLinkModal({ isOpen, contacts, orgs, onClose, onConfirm }) {
+  useEffect(() => {
+    const handleKey = e => { if (e.key === 'Escape') onClose() }
+    if (isOpen) window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+
+  // Group unlinked contacts by company name (case-insensitive)
+  const unlinked = contacts.filter(c => c.company && c.company.trim() && (!c.orgId || c.orgId === ''))
+  const grouped = {}
+  unlinked.forEach(c => {
+    const key = c.company.trim().toLowerCase()
+    if (!grouped[key]) grouped[key] = { name: c.company.trim(), contacts: [] }
+    grouped[key].contacts.push(c)
+  })
+
+  // Check which already have a matching org
+  const rows = Object.values(grouped).map(g => {
+    const existing = orgs.find(o => o.name.trim().toLowerCase() === g.name.toLowerCase())
+    return { ...g, existing }
+  }).sort((a, b) => b.contacts.length - a.contacts.length)
+
+  const toCreate = rows.filter(r => !r.existing)
+  const toLink   = rows.filter(r =>  r.existing)
+  const alreadyLinked = contacts.filter(c => c.orgId && c.orgId !== '').length
+  const totalWillLink = unlinked.length
+
+  if (rows.length === 0) return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal" style={{maxWidth:440}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-header"><span className="modal-title">🏛 Kurumları Otomatik Oluştur</span><button className="modal-close" onClick={onClose}>✕</button></div>
+        <div className="modal-body"><p style={{fontSize:14,color:'var(--gray-600)'}}>Bağlanabilecek yeni kişi bulunamadı. Tüm kişiler zaten bir kuruma bağlı veya kurum bilgisi boş.</p></div>
+        <div className="modal-footer"><button className="btn btn-secondary" onClick={onClose}>Kapat</button></div>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal modal-lg" onClick={e=>e.stopPropagation()}>
+        <div className="modal-header">
+          <span className="modal-title">🏛 Kurumları Otomatik Oluştur</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="autolink-summary">
+            <div className="autolink-stat"><span className="autolink-num">{toCreate.length}</span><span>yeni kurum oluşturulacak</span></div>
+            <div className="autolink-stat"><span className="autolink-num">{toLink.length > 0 ? toLink.length : '—'}</span><span>mevcut kuruma bağlanacak</span></div>
+            <div className="autolink-stat"><span className="autolink-num">{totalWillLink}</span><span>kişi bağlanacak</span></div>
+            <div className="autolink-stat muted"><span className="autolink-num">{alreadyLinked}</span><span>zaten bağlı (atlanır)</span></div>
+          </div>
+
+          {toCreate.length > 0 && (
+            <div className="form-section">
+              <div className="form-section-title">✨ Oluşturulacak Kurumlar ({toCreate.length})</div>
+              <div className="autolink-list">
+                {toCreate.map(r => (
+                  <div key={r.name} className="autolink-row">
+                    <div className="autolink-org-name">🏛 {r.name}</div>
+                    <div className="autolink-contacts">
+                      {r.contacts.slice(0,4).map(c=>(
+                        <span key={c.id} className="autolink-chip">
+                          {c.photo ? <img src={c.photo} style={{width:16,height:16,borderRadius:'50%',objectFit:'cover',verticalAlign:'middle',marginRight:3}} alt=""/> : null}
+                          {c.firstName} {c.lastName}
+                        </span>
+                      ))}
+                      {r.contacts.length > 4 && <span className="autolink-chip muted">+{r.contacts.length - 4}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {toLink.length > 0 && (
+            <div className="form-section">
+              <div className="form-section-title">🔗 Mevcut Kuruma Bağlanacaklar ({toLink.length})</div>
+              <div className="autolink-list">
+                {toLink.map(r => (
+                  <div key={r.name} className="autolink-row">
+                    <div className="autolink-org-name" style={{color:'#7c3aed'}}>🏛 {r.existing.name}</div>
+                    <div className="autolink-contacts">
+                      {r.contacts.slice(0,4).map(c=>(
+                        <span key={c.id} className="autolink-chip">
+                          {c.firstName} {c.lastName}
+                        </span>
+                      ))}
+                      {r.contacts.length > 4 && <span className="autolink-chip muted">+{r.contacts.length - 4}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>İptal</button>
+          <button className="btn btn-primary" onClick={() => onConfirm(rows)}>
+            ✅ {toCreate.length} Kurum Oluştur ve Bağla
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── DeleteModal ─── */
 function DeleteModal({ isOpen, name, message, onClose, onConfirm }) {
   useEffect(() => {
@@ -1461,6 +1570,32 @@ export default function App() {
   }
   const handleSaveConfig = (newConfig) => { setConfig(newConfig) }
 
+  const [autoLinkOpen, setAutoLinkOpen] = useState(false)
+  const handleAutoLink = (rows) => {
+    let newOrgs = [...orgs]
+    let updatedContacts = [...contacts]
+    rows.forEach(r => {
+      let orgId
+      if (r.existing) {
+        orgId = r.existing.id
+      } else {
+        const newOrg = { id: uid(), name: r.name, type:'', sector:'', country:'', city:'', website:'', phone:'', email:'', notes:'', photo:'', addedDate: todayStr() }
+        newOrgs.push(newOrg)
+        orgId = newOrg.id
+      }
+      r.contacts.forEach(c => {
+        const idx = updatedContacts.findIndex(x => x.id === c.id)
+        if (idx !== -1) updatedContacts[idx] = { ...updatedContacts[idx], orgId }
+      })
+    })
+    setOrgs(newOrgs)
+    setContacts(updatedContacts)
+    setAutoLinkOpen(false)
+    const created = rows.filter(r => !r.existing).length
+    const linked  = rows.reduce((sum, r) => sum + r.contacts.length, 0)
+    alert(`✅ ${created} kurum oluşturuldu, ${linked} kişi bağlandı.`)
+  }
+
   const handleSaveTask = (formData) => {
     if (editTaskId) setTasks(ts => ts.map(t => t.id===editTaskId ? {...t,...formData} : t))
     else setTasks(ts => [...ts, { id:uid(), ...formData, done:false, addedDate:todayStr() }])
@@ -1617,6 +1752,11 @@ export default function App() {
         <>
           <div className="filters-bar">
             <span className="results-count">{filteredOrgs.length} kurum</span>
+            {contacts.some(c => c.company && c.company.trim() && (!c.orgId || c.orgId === '')) && (
+              <button className="btn-export" style={{color:'var(--blue)',borderColor:'var(--blue-light)',fontWeight:700}} onClick={()=>setAutoLinkOpen(true)}>
+                🏛 Kişilerden Kurumları Oluştur
+              </button>
+            )}
             <div className="view-toggle" style={{marginLeft:'auto'}}>
               <button className={`view-btn${orgView==='card'?' active':''}`} onClick={()=>setOrgView('card')} title="Kart">⊞</button>
               <button className={`view-btn${orgView==='table'?' active':''}`} onClick={()=>setOrgView('table')} title="Tablo">☰</button>
@@ -1736,6 +1876,7 @@ export default function App() {
       <EventDetailModal isOpen={!!detailEventId} event={detailEvent} contacts={contacts} orgs={orgs}
         onClose={()=>setDetailEventId(null)} onEdit={id=>{setEditEventId(id);setEventFormOpen(true)}}
         onOpenContact={openContact} onOpenOrg={openOrg}/>
+      <AutoLinkModal isOpen={autoLinkOpen} contacts={contacts} orgs={orgs} onClose={()=>setAutoLinkOpen(false)} onConfirm={handleAutoLink}/>
       <TaskFormModal isOpen={taskFormOpen} editTask={tasks.find(t=>t.id===editTaskId)||null}
         contacts={contacts} orgs={orgs} events={events}
         onClose={()=>{setTaskFormOpen(false);setEditTaskId(null)}} onSave={handleSaveTask}/>
