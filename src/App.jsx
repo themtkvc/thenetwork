@@ -448,18 +448,30 @@ function OrgFormModal({ isOpen, editOrg, onClose, onSave }) {
                 <input className="form-control" value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Kurum adı"/>
               </div>
               <div className="form-group">
-                <label>Kurum Türü</label>
-                <select className="form-control" value={form.type} onChange={e=>set('type',e.target.value)}>
-                  <option value="">Seçin</option>
-                  {ORG_TYPES.map(t=><option key={t}>{t}</option>)}
-                </select>
+                <label>Kurum Türü <span style={{fontSize:11,color:'var(--gray-400)',fontWeight:400}}>(listeden seçin veya yazın)</span></label>
+                <input
+                  className="form-control"
+                  list="org-types-list"
+                  value={form.type}
+                  onChange={e=>set('type',e.target.value)}
+                  placeholder="Şirket, STK, Üniversite…"
+                />
+                <datalist id="org-types-list">
+                  {ORG_TYPES.map(t=><option key={t} value={t}/>)}
+                </datalist>
               </div>
               <div className="form-group">
-                <label>Sektör</label>
-                <select className="form-control" value={form.sector} onChange={e=>set('sector',e.target.value)}>
-                  <option value="">Seçin</option>
-                  {SECTORS.map(s=><option key={s}>{s}</option>)}
-                </select>
+                <label>Sektör <span style={{fontSize:11,color:'var(--gray-400)',fontWeight:400}}>(listeden seçin veya yazın)</span></label>
+                <input
+                  className="form-control"
+                  list="org-sectors-list"
+                  value={form.sector}
+                  onChange={e=>set('sector',e.target.value)}
+                  placeholder="Teknoloji, Sağlık, Enerji…"
+                />
+                <datalist id="org-sectors-list">
+                  {SECTORS.map(s=><option key={s} value={s}/>)}
+                </datalist>
               </div>
               <div className="form-group">
                 <label>Ülke</label>
