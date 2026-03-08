@@ -656,7 +656,7 @@ function EventFormModal({ isOpen, editEvent, contacts, orgs, config, onClose, on
             <div className="picker-list">
               {filteredContacts.slice(0,12).map(c => (
                 <div key={c.id} className={`picker-item${form.contactIds.includes(c.id)?' selected':''}`} onClick={()=>toggleContact(c.id)}>
-                  <div className="avatar" style={{width:28,height:28,fontSize:11,flexShrink:0}}>{(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
+                  <div className="avatar" style={{width:28,height:28,fontSize:11,flexShrink:0}}>{c.photo?<img src={c.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/>:(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
                   <div style={{flex:1}}>
                     <div style={{fontWeight:600,fontSize:12}}>{c.firstName} {c.lastName}</div>
                     {c.position && <div style={{fontSize:11,color:'var(--gray-500)'}}>{c.position}</div>}
@@ -930,7 +930,7 @@ function OrgDetailModal({ isOpen, org, contacts, allContacts, events, onClose, o
                   ? <p style={{fontSize:12,color:'var(--gray-400)',margin:0}}>Bağlanabilecek kişi bulunamadı.</p>
                   : filteredUnlinked.map(c => (
                     <div key={c.id} className="linked-contact-item link-picker-row" onClick={()=>{onLinkContact(c.id,org.id);setShowLinkPicker(false);setLinkSearch('')}}>
-                      <div className="avatar" style={{width:32,height:32,fontSize:12,flexShrink:0}}>{(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
+                      <div className="avatar" style={{width:32,height:32,fontSize:12,flexShrink:0}}>{c.photo?<img src={c.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/>:(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
                       <div style={{flex:1}}>
                         <div style={{fontWeight:600,fontSize:13}}>{c.firstName} {c.lastName}</div>
                         {(c.position||c.company) && <div style={{fontSize:11,color:'var(--gray-500)'}}>{c.position}{c.position&&c.company?' · ':''}{c.company}</div>}
@@ -947,7 +947,7 @@ function OrgDetailModal({ isOpen, org, contacts, allContacts, events, onClose, o
                 <div className="linked-contacts">
                   {linked.map(c => (
                     <div key={c.id} className="linked-contact-item" onClick={()=>{onClose();onOpenContact(c.id)}}>
-                      <div className="avatar" style={{width:34,height:34,fontSize:13}}>{(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
+                      <div className="avatar" style={{width:34,height:34,fontSize:13}}>{c.photo?<img src={c.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/>:(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
                       <div style={{flex:1}}>
                         <div style={{fontWeight:600,fontSize:13,color:'var(--gray-800)'}}>{c.firstName} {c.lastName}</div>
                         {c.position && <div style={{fontSize:12,color:'var(--gray-500)'}}>{c.position}</div>}
@@ -1057,7 +1057,7 @@ function EventDetailModal({ isOpen, event, contacts, orgs, onClose, onEdit, onOp
                 <div className="linked-contacts">
                   {linkedContacts.map(c => (
                     <div key={c.id} className="linked-contact-item" onClick={()=>{onClose();onOpenContact(c.id)}}>
-                      <div className="avatar" style={{width:34,height:34,fontSize:13}}>{(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
+                      <div className="avatar" style={{width:34,height:34,fontSize:13}}>{c.photo?<img src={c.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/>:(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
                       <div style={{flex:1}}>
                         <div style={{fontWeight:600,fontSize:13}}>{c.firstName} {c.lastName}</div>
                         {c.position && <div style={{fontSize:12,color:'var(--gray-500)'}}>{c.position}</div>}
