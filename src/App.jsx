@@ -17,7 +17,7 @@ const emptyForm = () => ({
   firstName:'', lastName:'', company:'', position:'', country:'', city:'',
   email:'', phone:'', linkedin:'', website:'',
   sector:'', relType:'', priority:'medium', tags:'',
-  meetDate:'', lastContact:'', nextFollowup:'', notes:'', opportunities:'',
+  meetDate:'', meetEventId:'', lastContact:'', nextFollowup:'', notes:'', opportunities:'',
   orgId:''
 })
 const emptyOrgForm = () => ({
@@ -285,7 +285,7 @@ function EmptyState({ type }) {
 }
 
 /* ─── FormModal (contact) ─── */
-function FormModal({ isOpen, editContact, orgs, config, onClose, onSave, onQuickCreateOrg, defaultOrgId }) {
+function FormModal({ isOpen, editContact, orgs, events, config, onClose, onSave, onQuickCreateOrg, defaultOrgId }) {
   const [form, setForm] = useState(emptyForm())
   const [showQuickOrg, setShowQuickOrg] = useState(false)
   const [quickOrgName, setQuickOrgName] = useState('')
@@ -302,7 +302,7 @@ function FormModal({ isOpen, editContact, orgs, config, onClose, onSave, onQuick
         linkedin: editContact.linkedin||'', website: editContact.website||'',
         sector: editContact.sector||'', relType: editContact.relType||'',
         priority: editContact.priority||'medium', tags: (editContact.tags||[]).join(', '),
-        meetDate: editContact.meetDate||'',
+        meetDate: editContact.meetDate||'', meetEventId: editContact.meetEventId||'',
         lastContact: editContact.lastContact||'', nextFollowup: editContact.nextFollowup||'',
         notes: editContact.notes||'', opportunities: editContact.opportunities||'',
         orgId: editContact.orgId||''
@@ -350,6 +350,19 @@ function FormModal({ isOpen, editContact, orgs, config, onClose, onSave, onQuick
               <div className="form-group">
                 <label>Tanışma Tarihi</label>
                 <input type="date" className="form-control" value={form.meetDate} onChange={e=>set('meetDate',e.target.value)}/>
+              </div>
+              <div className="form-group">
+                <label>Tanışılan Etkinlik</label>
+                <select className="form-control" value={form.meetEventId} onChange={e=>{
+                  const ev = (events||[]).find(x=>x.id===e.target.value)
+                  set('meetEventId', e.target.value)
+                  if (ev && ev.date && !form.meetDate) set('meetDate', ev.date)
+                }}>
+                  <option value="">— Seçin —</option>
+                  {(events||[]).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).map(ev=>(
+                    <option key={ev.id} value={ev.id}>{ev.title}{ev.date ? ` (${formatDate(ev.date)})` : ''}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -724,6 +737,7 @@ function DetailModal({ isOpen, contact, orgs, events, onClose, onEdit, onAddComm
             <div className="detail-section-title">📅 İletişim Takibi</div>
             <div className="info-grid">
               {c.meetDate && <div className="info-item"><div className="info-lbl">Tanışma Tarihi</div><div className="info-val" style={{fontWeight:600}}>{formatDate(c.meetDate)}</div></div>}
+              {c.meetEventId && (() => { const ev = (events||[]).find(x=>x.id===c.meetEventId); return ev ? <div className="info-item"><div className="info-lbl">Tanışılan Etkinlik</div><div className="info-val" style={{color:'var(--blue)',cursor:'pointer',fontWeight:600}} onClick={()=>{onClose();onOpenEvent(ev.id)}}>📅 {ev.title}</div></div> : null })()}
               <div className="info-item"><div className="info-lbl">Son İletişim</div><div className="info-val">{c.lastContact ? formatDate(c.lastContact) : '—'}</div></div>
               <div className="info-item"><div className="info-lbl">Sonraki Takip</div>
                 <div className="info-val" style={c.nextFollowup && c.nextFollowup < today ? {color:'var(--red)',fontWeight:700} : {}}>
@@ -1426,7 +1440,7 @@ export default function App() {
 
       {/* ── MODALS ── */}
       <FormModal
-        isOpen={formOpen} editContact={editContact} orgs={orgs} config={config}
+        isOpen={formOpen} editContact={editContact} orgs={orgs} events={events} config={config}
         defaultOrgId={pendingOrgId}
         onClose={()=>{setFormOpen(false);setEditId(null);setPendingOrgId('')}}
         onSave={(data)=>{handleSave(data);setPendingOrgId('')}}
