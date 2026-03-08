@@ -6,6 +6,7 @@ import {
   loadOrgs, saveOrgs,
   loadEvents, saveEvents,
   loadConfig, saveConfig,
+  loadTasks, saveTasks,
   parseCSVLine, DEFAULT_CONFIG
 } from './utils'
 
@@ -27,6 +28,10 @@ const emptyOrgForm = () => ({
 const emptyEventForm = () => ({
   title:'', date:'', endDate:'', location:'', type:'',
   description:'', orgIds:[], contactIds:[]
+})
+const emptyTaskForm = () => ({
+  title:'', notes:'', dueDate:'', priority:'medium',
+  contactId:'', orgId:'', eventId:''
 })
 
 /* ─── StatsBar ─── */
@@ -1036,6 +1041,156 @@ function EventDetailModal({ isOpen, event, contacts, orgs, onClose, onEdit, onOp
   )
 }
 
+/* ─── TaskFormModal ─── */
+function TaskFormModal({ isOpen, editTask, contacts, orgs, events, onClose, onSave }) {
+  const [form, setForm] = useState(emptyTaskForm())
+
+  useEffect(() => {
+    setForm(editTask ? {
+      title: editTask.title||'', notes: editTask.notes||'', dueDate: editTask.dueDate||'',
+      priority: editTask.priority||'medium',
+      contactId: editTask.contactId||'', orgId: editTask.orgId||'', eventId: editTask.eventId||''
+    } : emptyTaskForm())
+  }, [editTask, isOpen])
+
+  useEffect(() => {
+    const handleKey = e => { if (e.key === 'Escape') onClose() }
+    if (isOpen) window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [isOpen, onClose])
+
+  if (!isOpen) return null
+  const set = (k, v) => setForm(f => ({...f, [k]: v}))
+  const handleSave = () => { if (!form.title.trim()) { alert('Görev başlığı zorunludur.'); return; } onSave(form) }
+
+  const sortedEvents = [...(events||[])].sort((a,b)=>(b.date||'').localeCompare(a.date||''))
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="modal" style={{maxWidth:520}} onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <span className="modal-title">{editTask ? '✏️ Görevi Düzenle' : '✅ Yeni Görev'}</span>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="form-group" style={{marginBottom:14}}>
+            <label>Görev *</label>
+            <input className="form-control" value={form.title} onChange={e=>set('title',e.target.value)} placeholder="Ne yapılacak?" autoFocus/>
+          </div>
+          <div className="form-grid" style={{marginBottom:14}}>
+            <div className="form-group">
+              <label>Son Tarih</label>
+              <input type="date" className="form-control" value={form.dueDate} onChange={e=>set('dueDate',e.target.value)}/>
+            </div>
+            <div className="form-group">
+              <label>Öncelik</label>
+              <select className="form-control" value={form.priority} onChange={e=>set('priority',e.target.value)}>
+                <option value="high">🔴 Yüksek</option>
+                <option value="medium">🔵 Orta</option>
+                <option value="low">⚪ Düşük</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-section-title" style={{marginBottom:10}}>🔗 İlgili</div>
+          <div className="form-grid" style={{marginBottom:14}}>
+            <div className="form-group">
+              <label>Kişi</label>
+              <select className="form-control" value={form.contactId} onChange={e=>set('contactId',e.target.value)}>
+                <option value="">— Seçin —</option>
+                {[...(contacts||[])].sort((a,b)=>`${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`)).map(c=>(
+                  <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.company ? ` · ${c.company}` : ''}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label>Kurum</label>
+              <select className="form-control" value={form.orgId} onChange={e=>set('orgId',e.target.value)}>
+                <option value="">— Seçin —</option>
+                {[...(orgs||[])].sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(o=>(
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group full">
+              <label>Etkinlik</label>
+              <select className="form-control" value={form.eventId} onChange={e=>set('eventId',e.target.value)}>
+                <option value="">— Seçin —</option>
+                {sortedEvents.map(ev=>(
+                  <option key={ev.id} value={ev.id}>{ev.title}{ev.date ? ` (${formatDate(ev.date)})` : ''}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label>Notlar</label>
+            <textarea className="form-control" value={form.notes} onChange={e=>set('notes',e.target.value)} placeholder="Ek notlar…" style={{minHeight:64}}/>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>İptal</button>
+          <button className="btn btn-primary" onClick={handleSave}>💾 Kaydet</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ─── TaskItem ─── */
+function TaskItem({ task, contacts, orgs, events, onToggle, onEdit, onDelete, onOpenContact, onOpenOrg, onOpenEvent }) {
+  const today = todayStr()
+  const linkedContact = contacts.find(c => c.id === task.contactId)
+  const linkedOrg = orgs.find(o => o.id === task.orgId)
+  const linkedEvent = events.find(e => e.id === task.eventId)
+  const isOverdue = !task.done && task.dueDate && task.dueDate < today
+  const isSoon = !task.done && task.dueDate && task.dueDate >= today && dayDiff(today, task.dueDate) <= 3
+
+  return (
+    <div className={`task-item${task.done ? ' done' : ''}${isOverdue ? ' overdue' : ''}`}>
+      <button className="task-checkbox" onClick={() => onToggle(task.id)} title={task.done ? 'Yeniden aç' : 'Tamamla'}>
+        {task.done ? '✓' : ''}
+      </button>
+      <div className="task-body">
+        <div className="task-title-row">
+          <span className="task-title">{task.title}</span>
+          <div className="task-badges">
+            {task.priority === 'high'   && !task.done && <span className="task-priority high">●</span>}
+            {task.priority === 'medium' && !task.done && <span className="task-priority medium">●</span>}
+            {task.dueDate && (
+              <span className={`task-due${isOverdue ? ' overdue' : isSoon ? ' soon' : ''}`}>
+                {isOverdue ? '⚠ ' : '📅 '}{formatDate(task.dueDate)}
+              </span>
+            )}
+          </div>
+        </div>
+        {(linkedContact || linkedOrg || linkedEvent) && (
+          <div className="task-chips">
+            {linkedContact && (
+              <span className="task-chip chip-contact" onClick={()=>onOpenContact(linkedContact.id)}>
+                👤 {linkedContact.firstName} {linkedContact.lastName}
+              </span>
+            )}
+            {linkedOrg && (
+              <span className="task-chip chip-org" onClick={()=>onOpenOrg(linkedOrg.id)}>
+                🏛 {linkedOrg.name}
+              </span>
+            )}
+            {linkedEvent && (
+              <span className="task-chip chip-event" onClick={()=>onOpenEvent(linkedEvent.id)}>
+                📅 {linkedEvent.title}
+              </span>
+            )}
+          </div>
+        )}
+        {task.notes && <div className="task-notes">{task.notes}</div>}
+      </div>
+      <div className="task-actions">
+        <button className="btn-icon edit" onClick={()=>onEdit(task.id)} title="Düzenle">✏</button>
+        <button className="btn-icon danger" onClick={()=>onDelete(task.id)} title="Sil">🗑</button>
+      </div>
+    </div>
+  )
+}
+
 /* ─── DeleteModal ─── */
 function DeleteModal({ isOpen, name, message, onClose, onConfirm }) {
   useEffect(() => {
@@ -1139,6 +1294,7 @@ export default function App() {
   const [orgs, setOrgs]         = useState(() => loadOrgs())
   const [events, setEvents]     = useState(() => loadEvents())
   const [config, setConfig]     = useState(() => loadConfig())
+  const [tasks, setTasks]       = useState(() => loadTasks())
   const [activeModule, setActiveModule] = useState('contacts')
 
   // contact states
@@ -1171,10 +1327,17 @@ export default function App() {
   const [detailEventId, setDetailEventId]   = useState(null)
   const [deleteEventId, setDeleteEventId]   = useState(null)
 
+  // task states
+  const [taskFilter, setTaskFilter]       = useState('active') // 'all' | 'active' | 'done'
+  const [taskFormOpen, setTaskFormOpen]   = useState(false)
+  const [editTaskId, setEditTaskId]       = useState(null)
+  const [deleteTaskId, setDeleteTaskId]   = useState(null)
+
   useEffect(() => { saveContacts(contacts) }, [contacts])
   useEffect(() => { saveOrgs(orgs) }, [orgs])
   useEffect(() => { saveEvents(events) }, [events])
   useEffect(() => { saveConfig(config) }, [config])
+  useEffect(() => { saveTasks(tasks) }, [tasks])
 
   const filtered = contacts.filter(c => {
     const q = search.toLowerCase().trim()
@@ -1257,6 +1420,14 @@ export default function App() {
   }
   const handleSaveConfig = (newConfig) => { setConfig(newConfig) }
 
+  const handleSaveTask = (formData) => {
+    if (editTaskId) setTasks(ts => ts.map(t => t.id===editTaskId ? {...t,...formData} : t))
+    else setTasks(ts => [...ts, { id:uid(), ...formData, done:false, addedDate:todayStr() }])
+    setTaskFormOpen(false); setEditTaskId(null)
+  }
+  const handleToggleTask = (id) => { setTasks(ts => ts.map(t => t.id===id ? {...t, done:!t.done, doneDate: !t.done ? todayStr() : ''} : t)) }
+  const handleDeleteTask = () => { setTasks(ts => ts.filter(t => t.id!==deleteTaskId)); setDeleteTaskId(null) }
+
   const exportCSV = () => {
     const headers = ['Ad','Soyad','Kurum','Pozisyon','Ülke','Şehir','E-posta','Telefon','LinkedIn','Web Sitesi','Sektör','İlişki Türü','Öncelik','Etiketler','Tanışma Tarihi','Son İletişim','Takip Tarihi','Notlar','Fırsatlar']
     const rows = contacts.map(c => [
@@ -1330,11 +1501,14 @@ export default function App() {
           <button className={`nav-module-btn${activeModule==='events'?' active':''}`} onClick={()=>setActiveModule('events')}>
             📅 Etkinlikler <span className="mod-count">{events.length}</span>
           </button>
+          <button className={`nav-module-btn${activeModule==='tasks'?' active':''}`} onClick={()=>setActiveModule('tasks')}>
+            ✅ Takip <span className="mod-count">{tasks.filter(t=>!t.done).length}</span>
+          </button>
           <button className={`nav-module-btn${activeModule==='admin'?' active':''}`} onClick={()=>setActiveModule('admin')}>
             ⚙ Admin
           </button>
         </div>
-        {activeModule !== 'admin' && (
+        {activeModule !== 'admin' && activeModule !== 'tasks' && (
           <div className="search-wrap">
             <span className="search-icon">🔍</span>
             <input type="text" value={searchValue} onChange={e=>setSearchValue(e.target.value)} placeholder={searchPlaceholder}/>
@@ -1344,6 +1518,7 @@ export default function App() {
           {activeModule==='contacts' && <button className="btn-add-nav" onClick={()=>{setEditId(null);setFormOpen(true)}}>＋ Kişi Ekle</button>}
           {activeModule==='orgs'     && <button className="btn-add-nav btn-add-org" onClick={()=>{setEditOrgId(null);setOrgFormOpen(true)}}>＋ Kurum Ekle</button>}
           {activeModule==='events'   && <button className="btn-add-nav btn-add-event" onClick={()=>{setEditEventId(null);setEventFormOpen(true)}}>＋ Etkinlik Ekle</button>}
+          {activeModule==='tasks'    && <button className="btn-add-nav btn-add-task" onClick={()=>{setEditTaskId(null);setTaskFormOpen(true)}}>＋ Görev Ekle</button>}
         </div>
       </nav>
 
@@ -1433,6 +1608,66 @@ export default function App() {
         </>
       )}
 
+      {/* ── TASKS ── */}
+      {activeModule === 'tasks' && (() => {
+        const today = todayStr()
+        const pendingTasks = tasks.filter(t => !t.done)
+        const doneTasks    = tasks.filter(t =>  t.done)
+        const visibleTasks = taskFilter === 'active' ? pendingTasks
+          : taskFilter === 'done' ? doneTasks : tasks
+        const sorted = [...visibleTasks].sort((a,b) => {
+          if (a.done !== b.done) return a.done ? 1 : -1
+          if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate)
+          if (a.dueDate) return -1; if (b.dueDate) return 1
+          const p = {high:0,medium:1,low:2}
+          return (p[a.priority]||1) - (p[b.priority]||1)
+        })
+        return (
+          <div className="task-module">
+            <div className="task-filter-bar">
+              <div className="task-filter-tabs">
+                <button className={`task-filter-btn${taskFilter==='active'?' active':''}`} onClick={()=>setTaskFilter('active')}>
+                  Bekleyen <span className="tab-count">{pendingTasks.length}</span>
+                </button>
+                <button className={`task-filter-btn${taskFilter==='done'?' active':''}`} onClick={()=>setTaskFilter('done')}>
+                  Tamamlanan <span className="tab-count">{doneTasks.length}</span>
+                </button>
+                <button className={`task-filter-btn${taskFilter==='all'?' active':''}`} onClick={()=>setTaskFilter('all')}>
+                  Tümü <span className="tab-count">{tasks.length}</span>
+                </button>
+              </div>
+            </div>
+            <div className="task-list">
+              {sorted.length === 0
+                ? (
+                  <div className="task-empty">
+                    <div style={{fontSize:48,marginBottom:14}}>{taskFilter==='done' ? '🎉' : '✅'}</div>
+                    <div style={{fontSize:16,fontWeight:700,color:'var(--gray-600)',marginBottom:6}}>
+                      {taskFilter==='done' ? 'Henüz tamamlanan görev yok' : taskFilter==='active' ? 'Bekleyen görev yok!' : 'Henüz görev eklenmedi'}
+                    </div>
+                    <div style={{fontSize:13,color:'var(--gray-400)'}}>
+                      {taskFilter==='active' && '＋ Görev Ekle butonuyla yeni görev oluşturun.'}
+                    </div>
+                  </div>
+                )
+                : sorted.map(task => (
+                  <TaskItem
+                    key={task.id} task={task}
+                    contacts={contacts} orgs={orgs} events={events}
+                    onToggle={handleToggleTask}
+                    onEdit={id => { setEditTaskId(id); setTaskFormOpen(true) }}
+                    onDelete={id => setDeleteTaskId(id)}
+                    onOpenContact={id => { setDetailId(id); setActiveModule('contacts') }}
+                    onOpenOrg={id => { setDetailOrgId(id); setActiveModule('orgs') }}
+                    onOpenEvent={id => { setDetailEventId(id); setActiveModule('events') }}
+                  />
+                ))
+              }
+            </div>
+          </div>
+        )
+      })()}
+
       {/* ── ADMIN ── */}
       {activeModule === 'admin' && (
         <AdminPanel config={config} onSaveConfig={handleSaveConfig}/>
@@ -1460,6 +1695,10 @@ export default function App() {
       <EventDetailModal isOpen={!!detailEventId} event={detailEvent} contacts={contacts} orgs={orgs}
         onClose={()=>setDetailEventId(null)} onEdit={id=>{setEditEventId(id);setEventFormOpen(true)}}
         onOpenContact={openContact} onOpenOrg={openOrg}/>
+      <TaskFormModal isOpen={taskFormOpen} editTask={tasks.find(t=>t.id===editTaskId)||null}
+        contacts={contacts} orgs={orgs} events={events}
+        onClose={()=>{setTaskFormOpen(false);setEditTaskId(null)}} onSave={handleSaveTask}/>
+      <DeleteModal isOpen={!!deleteTaskId} name={tasks.find(t=>t.id===deleteTaskId)?.title||''} onClose={()=>setDeleteTaskId(null)} onConfirm={handleDeleteTask}/>
       <DeleteModal isOpen={!!deleteId} name={deleteContact?`${deleteContact.firstName} ${deleteContact.lastName}`:''} onClose={()=>setDeleteId(null)} onConfirm={handleDelete}/>
       <DeleteModal isOpen={!!deleteOrgId} name={deleteOrg?.name||''} message={deleteOrg?`"${deleteOrg.name}" kurumunu silmek istediğinize emin misiniz? Bu kuruma bağlı kişilerin bağlantısı kaldırılacak.`:''}
         onClose={()=>setDeleteOrgId(null)} onConfirm={handleDeleteOrg}/>

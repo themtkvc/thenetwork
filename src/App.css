@@ -625,8 +625,93 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 }
 .selected-chip:hover { background: #fee2e2; color: var(--red); border-color: #fecaca; }
 
+/* Add task button */
+.btn-add-nav.btn-add-task { background: #10b981; color: white; }
+.btn-add-nav.btn-add-task:hover { background: #059669; }
+
+/* ─── Task Module ─── */
+.task-module { max-width: 780px; margin: 0 auto; padding: 20px 24px 48px; }
+
+.task-filter-bar { margin-bottom: 16px; }
+.task-filter-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--gray-200); }
+.task-filter-btn {
+  padding: 10px 20px; border: none; background: transparent; cursor: pointer;
+  font-size: 13.5px; font-weight: 600; color: var(--gray-500);
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: color 0.18s, border-color 0.18s; display: flex; align-items: center; gap: 7px;
+}
+.task-filter-btn:hover { color: var(--gray-700); }
+.task-filter-btn.active { color: var(--navy); border-bottom-color: var(--navy); }
+.task-filter-btn.active .tab-count { background: var(--navy); color: white; }
+
+.task-list { display: flex; flex-direction: column; gap: 0; }
+
+.task-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 14px 16px; background: white;
+  border: 1px solid var(--gray-200); border-top: none;
+  transition: background 0.15s; position: relative;
+}
+.task-item:first-child { border-top: 1px solid var(--gray-200); border-radius: var(--radius) var(--radius) 0 0; }
+.task-item:last-child  { border-radius: 0 0 var(--radius) var(--radius); }
+.task-item:first-child:last-child { border-radius: var(--radius); }
+.task-item:hover { background: var(--gray-50); }
+.task-item:hover .task-actions { opacity: 1; }
+.task-item.done { background: var(--gray-50); }
+.task-item.overdue { border-left: 3px solid var(--red); }
+
+.task-checkbox {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--gray-300); background: white;
+  cursor: pointer; flex-shrink: 0; margin-top: 1px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: white;
+  transition: border-color 0.18s, background 0.18s;
+}
+.task-checkbox:hover { border-color: var(--green); background: #d1fae5; color: var(--green); }
+.task-item.done .task-checkbox { background: var(--green); border-color: var(--green); }
+
+.task-body { flex: 1; min-width: 0; }
+
+.task-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.task-title { font-size: 14px; font-weight: 600; color: var(--gray-800); line-height: 1.4; }
+.task-item.done .task-title { text-decoration: line-through; color: var(--gray-400); }
+
+.task-badges { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-shrink: 0; }
+.task-priority { font-size: 10px; line-height: 1; }
+.task-priority.high   { color: var(--red); }
+.task-priority.medium { color: var(--blue); }
+.task-due {
+  font-size: 11.5px; font-weight: 600; color: var(--gray-500);
+  padding: 2px 8px; border-radius: 10px; background: var(--gray-100);
+}
+.task-due.overdue { background: #fee2e2; color: var(--red); }
+.task-due.soon    { background: #fef3c7; color: #92400e; }
+.task-item.done .task-due { opacity: 0.5; }
+
+.task-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.task-chip {
+  font-size: 11.5px; font-weight: 600; padding: 2px 9px;
+  border-radius: 22px; cursor: pointer; transition: opacity 0.15s;
+}
+.task-chip:hover { opacity: 0.75; }
+.chip-contact { background: #dbeafe; color: #1d4ed8; }
+.chip-org     { background: #ede9fe; color: #5b21b6; }
+.chip-event   { background: #ccfbf1; color: #065f46; }
+
+.task-notes { font-size: 12.5px; color: var(--gray-500); margin-top: 5px; line-height: 1.5; white-space: pre-wrap; }
+
+.task-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; margin-top: 1px; }
+
+.task-empty {
+  text-align: center; padding: 60px 20px; color: var(--gray-400);
+  background: white; border: 1px solid var(--gray-200); border-radius: var(--radius);
+}
+
 @media (max-width: 640px) {
   .nav-modules { gap: 0; padding: 2px; }
   .nav-module-btn { padding: 5px 10px; font-size: 12px; }
   .admin-grid { grid-template-columns: 1fr; }
+  .task-module { padding: 14px 14px 40px; }
+  .task-badges { margin-left: 0; }
 }

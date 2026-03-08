@@ -132,6 +132,17 @@ export function saveEvents(events) {
   localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
 }
 
+const TASKS_KEY = 'gnm_tasks_v1';
+export function loadTasks() {
+  try {
+    const raw = localStorage.getItem(TASKS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+export function saveTasks(tasks) {
+  localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+}
+
 export function parseCSVLine(line) {
   const result = []; let cur = ''; let inQ = false;
   for (let i = 0; i < line.length; i++) {
