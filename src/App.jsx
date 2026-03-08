@@ -1095,7 +1095,10 @@ function TaskFormModal({ isOpen, editTask, contacts, orgs, events, onClose, onSa
           <div className="form-grid" style={{marginBottom:14}}>
             <div className="form-group">
               <label>Kişi</label>
-              <select className="form-control" value={form.contactId} onChange={e=>set('contactId',e.target.value)}>
+              <select className="form-control" value={form.contactId} onChange={e=>{
+                const c = (contacts||[]).find(x=>x.id===e.target.value)
+                setForm(f => ({...f, contactId: e.target.value, orgId: c?.orgId && !f.orgId ? c.orgId : f.orgId}))
+              }}>
                 <option value="">— Seçin —</option>
                 {[...(contacts||[])].sort((a,b)=>`${a.firstName}${a.lastName}`.localeCompare(`${b.firstName}${b.lastName}`)).map(c=>(
                   <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.company ? ` · ${c.company}` : ''}</option>
