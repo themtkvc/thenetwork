@@ -450,3 +450,183 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   transition: opacity 0.15s;
   flex-shrink: 0;
 }
+
+/* ─── Module Nav ─── */
+.nav-modules {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  background: rgba(255,255,255,0.08);
+  border-radius: 22px;
+  padding: 3px;
+}
+.nav-module-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 18px;
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+.nav-module-btn:hover { background: rgba(255,255,255,0.12); color: white; }
+.nav-module-btn.active { background: var(--gold); color: var(--navy); }
+.nav-module-btn.active:hover { background: var(--gold-light); }
+.mod-count {
+  background: rgba(0,0,0,0.15);
+  color: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+.nav-module-btn.active .mod-count { background: rgba(26,47,78,0.2); }
+
+/* Teal stat icon */
+.stat-icon.teal { background: #ccfbf1; }
+
+/* ─── Event Card ─── */
+.event-card::before { background: linear-gradient(90deg, #0ea5e9, #0284c7); }
+.event-card:hover { border-color: #7dd3fc; }
+.event-avatar {
+  background: linear-gradient(135deg, #0284c7, #0ea5e9) !important;
+}
+.event-past { opacity: 0.75; }
+.event-past::before { background: var(--gray-300) !important; }
+
+/* Add event button */
+.btn-add-nav.btn-add-event { background: #0ea5e9; color: white; }
+.btn-add-nav.btn-add-event:hover { background: #0284c7; }
+
+/* ─── Admin Panel ─── */
+.admin-panel {
+  padding: 24px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+.admin-header {
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--gray-200);
+}
+.admin-header h2 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--gray-800);
+  margin-bottom: 6px;
+}
+.admin-header p { font-size: 13.5px; color: var(--gray-500); }
+.admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.admin-section {
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+.admin-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.admin-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray-700);
+}
+.admin-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 14px;
+  min-height: 34px;
+}
+.admin-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 22px;
+  padding: 3px 10px 3px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+.admin-tag button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400);
+  font-size: 11px;
+  padding: 0 0 0 2px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.admin-tag button:hover { color: var(--red); }
+.admin-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.admin-add-row .form-control { flex: 1; }
+
+/* Extra small button */
+.btn-xs { padding: 4px 10px; font-size: 11.5px; }
+
+/* ─── Multi-select Picker (Event Form) ─── */
+.picker-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+}
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--gray-100);
+  transition: background 0.15s;
+}
+.picker-item:last-child { border-bottom: none; }
+.picker-item:hover { background: #eff6ff; }
+.picker-item.selected { background: #dbeafe; }
+
+/* Selected chips above picker */
+.selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  border-radius: 22px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.selected-chip:hover { background: #fee2e2; color: var(--red); border-color: #fecaca; }
+
+@media (max-width: 640px) {
+  .nav-modules { gap: 0; padding: 2px; }
+  .nav-module-btn { padding: 5px 10px; font-size: 12px; }
+  .admin-grid { grid-template-columns: 1fr; }
+}

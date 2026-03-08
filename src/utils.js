@@ -1,3 +1,10 @@
+export const DEFAULT_CONFIG = {
+  sectors: ['Teknoloji','Finans','Sağlık','Eğitim & Akademi','Enerji','Hukuk','Medya & İletişim','Danışmanlık','Gayrimenkul','Üretim & Sanayi','Sivil Toplum','Kamu & Diplomasi','Diğer'],
+  orgTypes: ['Şirket','Üniversite','Araştırma Enstitüsü','STK / Vakıf','Kamu Kurumu','Uluslararası Kuruluş','Girişim','Yatırım Fonu','Medya Kuruluşu','Diğer'],
+  relTypes: ['Müşteri','Partner','Mentor','Meslektaş','Yatırımcı','Tedarikçi','Akademisyen','Eski İş Arkadaşı','Arkadaş','Potansiyel Müşteri','Diğer'],
+  eventTypes: ['Konferans','Networking','Workshop','Panel','Seminer','Zirve','Fuar','Yuvarlak Masa','Diğer']
+}
+
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
@@ -27,6 +34,7 @@ export function getSampleData() {
       linkedin: 'https://linkedin.com/in/sophiemuller', website: '',
       sector: 'Teknoloji', relType: 'Partner', priority: 'high',
       tags: ['yapay zeka', 'startup'],
+      meetDate: '2025-06-01',
       lastContact: '2026-02-10', nextFollowup: '2026-03-15',
       communications: [
         { id: uid(), date: '2026-02-10', type: 'meeting', note: "Berlin'de ofisinde buluştuk. Ortak AR-GE projesi için MOU imzaladık." },
@@ -44,6 +52,7 @@ export function getSampleData() {
       linkedin: '', website: 'https://sgventures.com',
       sector: 'Finans', relType: 'Yatırımcı', priority: 'high',
       tags: ['yatırım', 'ASEAN', 'seri-A'],
+      meetDate: '2025-09-15',
       lastContact: '2026-01-28', nextFollowup: '2026-03-05',
       communications: [
         { id: uid(), date: '2026-01-28', type: 'call', note: 'Yeni fon stratejisi hakkında 45 dk. konuştuk.' }
@@ -60,6 +69,7 @@ export function getSampleData() {
       linkedin: 'https://linkedin.com/in/amaradiallo', website: '',
       sector: 'Sağlık', relType: 'Akademisyen', priority: 'medium',
       tags: ['global sağlık', 'araştırma', 'Afrika'],
+      meetDate: '2025-12-05',
       lastContact: '2025-12-05', nextFollowup: '2026-04-01',
       communications: [
         { id: uid(), date: '2025-12-05', type: 'linkedin', note: 'WHO konferansı sonrası bağlantı isteği kabul edildi.' }
@@ -71,34 +81,55 @@ export function getSampleData() {
   ];
 }
 
-const STORAGE_KEY = 'gnm_contacts_v2';
-
+const CONTACTS_KEY = 'gnm_contacts_v2';
 export function loadContacts() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(CONTACTS_KEY);
     return raw ? JSON.parse(raw) : getSampleData();
-  } catch {
-    return getSampleData();
-  }
+  } catch { return getSampleData(); }
 }
-
 export function saveContacts(contacts) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts));
+  localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
 }
 
-const ORG_STORAGE_KEY = 'gnm_orgs_v1';
-
+const ORG_KEY = 'gnm_orgs_v1';
 export function loadOrgs() {
   try {
-    const raw = localStorage.getItem(ORG_STORAGE_KEY);
+    const raw = localStorage.getItem(ORG_KEY);
     return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
+}
+export function saveOrgs(orgs) {
+  localStorage.setItem(ORG_KEY, JSON.stringify(orgs));
 }
 
-export function saveOrgs(orgs) {
-  localStorage.setItem(ORG_STORAGE_KEY, JSON.stringify(orgs));
+const CONFIG_KEY = 'gnm_config_v1';
+export function loadConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (!raw) return { ...DEFAULT_CONFIG };
+    const saved = JSON.parse(raw);
+    return {
+      sectors:    saved.sectors    || DEFAULT_CONFIG.sectors,
+      orgTypes:   saved.orgTypes   || DEFAULT_CONFIG.orgTypes,
+      relTypes:   saved.relTypes   || DEFAULT_CONFIG.relTypes,
+      eventTypes: saved.eventTypes || DEFAULT_CONFIG.eventTypes,
+    };
+  } catch { return { ...DEFAULT_CONFIG }; }
+}
+export function saveConfig(config) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
+const EVENTS_KEY = 'gnm_events_v1';
+export function loadEvents() {
+  try {
+    const raw = localStorage.getItem(EVENTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+export function saveEvents(events) {
+  localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
 }
 
 export function parseCSVLine(line) {
