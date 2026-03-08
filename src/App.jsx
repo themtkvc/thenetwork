@@ -19,15 +19,15 @@ const emptyForm = () => ({
   email:'', phone:'', linkedin:'', website:'',
   sector:'', relType:'', priority:'medium', tags:'',
   meetDate:'', meetEventId:'', lastContact:'', nextFollowup:'', notes:'', opportunities:'',
-  orgId:''
+  orgId:'', photo:''
 })
 const emptyOrgForm = () => ({
   name:'', type:'', sector:'', country:'', city:'',
-  website:'', phone:'', email:'', notes:''
+  website:'', phone:'', email:'', notes:'', photo:''
 })
 const emptyEventForm = () => ({
   title:'', date:'', endDate:'', location:'', type:'',
-  description:'', orgIds:[], contactIds:[]
+  description:'', orgIds:[], contactIds:[], photo:''
 })
 const emptyTaskForm = () => ({
   title:'', notes:'', dueDate:'', priority:'medium',
@@ -91,7 +91,7 @@ function ContactCard({ c, onOpen, onEdit, onDelete, orgs }) {
   return (
     <div className={`contact-card priority-${c.priority||'medium'}`} onClick={() => onOpen(c.id)}>
       <div className="card-header">
-        <div className="avatar">{initials}</div>
+        <div className="avatar">{c.photo ? <img src={c.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/> : initials}</div>
         <div style={{flex:1,minWidth:0}}>
           <div className="card-name">{c.firstName} {c.lastName}</div>
           {c.position && <div className="card-position">{c.position}</div>}
@@ -122,7 +122,7 @@ function OrgCard({ org, contacts, onOpen, onEdit, onDelete }) {
   return (
     <div className="org-card" onClick={() => onOpen(org.id)}>
       <div className="card-header">
-        <div className="org-avatar">🏛</div>
+        <div className="org-avatar">{org.photo ? <img src={org.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/> : '🏛'}</div>
         <div style={{flex:1,minWidth:0}}>
           <div className="card-name">{org.name}</div>
           {org.type && <div className="card-position">{org.type}</div>}
@@ -155,7 +155,7 @@ function EventCard({ event, contacts, orgs, onOpen, onEdit, onDelete }) {
   return (
     <div className={`org-card event-card${isPast?' event-past':''}`} onClick={() => onOpen(event.id)}>
       <div className="card-header">
-        <div className="org-avatar event-avatar">📅</div>
+        <div className="org-avatar event-avatar">{event.photo ? <img src={event.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/> : '📅'}</div>
         <div style={{flex:1,minWidth:0}}>
           <div className="card-name">{event.title}</div>
           {event.date && <div className="card-position">
@@ -200,7 +200,7 @@ function TableView({ list, onOpen, onEdit, onDelete, orgs }) {
               <tr key={c.id}>
                 <td>
                   <div style={{display:'flex',alignItems:'center',gap:9}}>
-                    <div className="avatar" style={{width:32,height:32,fontSize:12}}>{initials}</div>
+                    <div className="avatar" style={{width:32,height:32,fontSize:12}}>{c.photo ? <img src={c.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/> : initials}</div>
                     <div>
                       <div className="table-name" onClick={()=>onOpen(c.id)}>{c.firstName} {c.lastName}</div>
                       {c.position && <div className="table-sub">{c.position}</div>}
@@ -289,6 +289,41 @@ function EmptyState({ type }) {
   )
 }
 
+/* ─── PhotoUpload ─── */
+function PhotoUpload({ value, onChange }) {
+  const inputRef = useRef()
+  const handleFile = (e) => {
+    const file = e.target.files[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 320
+        const ratio = Math.min(MAX / img.width, MAX / img.height, 1)
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.round(img.width * ratio)
+        canvas.height = Math.round(img.height * ratio)
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+        onChange(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      img.src = ev.target.result
+    }
+    reader.readAsDataURL(file); e.target.value = ''
+  }
+  return (
+    <div className="photo-upload-wrap">
+      <div className={`photo-upload${value ? ' has-photo' : ''}`} onClick={() => inputRef.current.click()} title="Fotoğraf ekle / değiştir">
+        {value
+          ? <img src={value} className="photo-upload-img" alt="Profil"/>
+          : <div className="photo-upload-placeholder"><span style={{fontSize:22}}>📷</span><span>Fotoğraf</span></div>
+        }
+      </div>
+      {value && <button type="button" className="photo-remove-btn" onClick={e=>{e.preventDefault();onChange('')}} title="Kaldır">✕</button>}
+      <input ref={inputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handleFile}/>
+    </div>
+  )
+}
+
 /* ─── FormModal (contact) ─── */
 function FormModal({ isOpen, editContact, orgs, events, config, onClose, onSave, onQuickCreateOrg, defaultOrgId }) {
   const [form, setForm] = useState(emptyForm())
@@ -310,7 +345,7 @@ function FormModal({ isOpen, editContact, orgs, events, config, onClose, onSave,
         meetDate: editContact.meetDate||'', meetEventId: editContact.meetEventId||'',
         lastContact: editContact.lastContact||'', nextFollowup: editContact.nextFollowup||'',
         notes: editContact.notes||'', opportunities: editContact.opportunities||'',
-        orgId: editContact.orgId||''
+        orgId: editContact.orgId||'', photo: editContact.photo||''
       })
     } else {
       setForm({...emptyForm(), orgId: defaultOrgId||''})
@@ -341,6 +376,7 @@ function FormModal({ isOpen, editContact, orgs, events, config, onClose, onSave,
         <div className="modal-body">
           <div className="form-section">
             <div className="form-section-title">👤 Temel Bilgiler</div>
+            <PhotoUpload value={form.photo} onChange={v=>set('photo',v)}/>
             <div className="form-grid">
               <div className="form-group"><label>Ad *</label><input className="form-control" value={form.firstName} onChange={e=>set('firstName',e.target.value)} placeholder="Adı"/></div>
               <div className="form-group"><label>Soyad *</label><input className="form-control" value={form.lastName} onChange={e=>set('lastName',e.target.value)} placeholder="Soyadı"/></div>
@@ -466,7 +502,7 @@ function OrgFormModal({ isOpen, editOrg, config, onClose, onSave }) {
       name: editOrg.name||'', type: editOrg.type||'', sector: editOrg.sector||'',
       country: editOrg.country||'', city: editOrg.city||'',
       website: editOrg.website||'', phone: editOrg.phone||'',
-      email: editOrg.email||'', notes: editOrg.notes||''
+      email: editOrg.email||'', notes: editOrg.notes||'', photo: editOrg.photo||''
     } : emptyOrgForm())
   }, [editOrg, isOpen])
 
@@ -490,6 +526,7 @@ function OrgFormModal({ isOpen, editOrg, config, onClose, onSave }) {
         <div className="modal-body">
           <div className="form-section">
             <div className="form-section-title">🏛 Kurum Bilgileri</div>
+            <PhotoUpload value={form.photo} onChange={v=>set('photo',v)}/>
             <div className="form-grid">
               <div className="form-group full">
                 <label>Kurum Adı *</label>
@@ -538,7 +575,7 @@ function EventFormModal({ isOpen, editEvent, contacts, orgs, config, onClose, on
     setForm(editEvent ? {
       title: editEvent.title||'', date: editEvent.date||'', endDate: editEvent.endDate||'',
       location: editEvent.location||'', type: editEvent.type||'', description: editEvent.description||'',
-      orgIds: editEvent.orgIds||[], contactIds: editEvent.contactIds||[]
+      orgIds: editEvent.orgIds||[], contactIds: editEvent.contactIds||[], photo: editEvent.photo||''
     } : emptyEventForm())
     setContactSearch(''); setOrgSearch('')
   }, [editEvent, isOpen])
@@ -575,6 +612,7 @@ function EventFormModal({ isOpen, editEvent, contacts, orgs, config, onClose, on
         <div className="modal-body">
           <div className="form-section">
             <div className="form-section-title">📅 Etkinlik Bilgileri</div>
+            <PhotoUpload value={form.photo} onChange={v=>set('photo',v)}/>
             <div className="form-grid">
               <div className="form-group full">
                 <label>Etkinlik Adı *</label>
@@ -694,7 +732,7 @@ function DetailModal({ isOpen, contact, orgs, events, onClose, onEdit, onAddComm
         <div style={{position:'relative'}}>
           <button className="modal-close" onClick={onClose} style={{position:'absolute',top:10,right:10,zIndex:10}}>✕</button>
           <div className="detail-hero">
-            <div className="detail-avatar">{initials}</div>
+            <div className="detail-avatar">{c.photo ? <img src={c.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/> : initials}</div>
             <div className="detail-hero-info">
               <h2>{c.firstName} {c.lastName}</h2>
               <p>{c.position}{c.position && (linkedOrg?.name || c.company) ? ' · ' : ''}{linkedOrg?.name || c.company}</p>
@@ -847,7 +885,7 @@ function OrgDetailModal({ isOpen, org, contacts, allContacts, events, onClose, o
         <div style={{position:'relative'}}>
           <button className="modal-close" onClick={onClose} style={{position:'absolute',top:10,right:10,zIndex:10}}>✕</button>
           <div className="detail-hero">
-            <div className="org-detail-avatar">🏛</div>
+            <div className="org-detail-avatar">{org.photo ? <img src={org.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/> : '🏛'}</div>
             <div className="detail-hero-info">
               <h2>{org.name}</h2>
               <p>{org.type}{org.type && org.sector ? ' · ' : ''}{org.sector}</p>
@@ -969,7 +1007,7 @@ function EventDetailModal({ isOpen, event, contacts, orgs, onClose, onEdit, onOp
         <div style={{position:'relative'}}>
           <button className="modal-close" onClick={onClose} style={{position:'absolute',top:10,right:10,zIndex:10}}>✕</button>
           <div className="detail-hero">
-            <div className="org-detail-avatar" style={{background:'linear-gradient(135deg,#0ea5e9,#0284c7)'}}>📅</div>
+            <div className="org-detail-avatar" style={event.photo ? {padding:0,overflow:'hidden'} : {background:'linear-gradient(135deg,#0ea5e9,#0284c7)'}}>{event.photo ? <img src={event.photo} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} alt=""/> : '📅'}</div>
             <div className="detail-hero-info">
               <h2>{event.title}</h2>
               <p>{event.type}</p>
