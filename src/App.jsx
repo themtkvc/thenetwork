@@ -478,14 +478,18 @@ function OrgFormModal({ isOpen, editOrg, config, onClose, onSave }) {
                 <input className="form-control" value={form.name} onChange={e=>set('name',e.target.value)} placeholder="Kurum adı"/>
               </div>
               <div className="form-group">
-                <label>Kurum Türü <span style={{fontSize:11,color:'var(--gray-400)',fontWeight:400}}>(listeden seçin veya yazın)</span></label>
-                <input className="form-control" list="org-types-list" value={form.type} onChange={e=>set('type',e.target.value)} placeholder="Şirket, STK, Üniversite…"/>
-                <datalist id="org-types-list">{cfg.orgTypes.map(t=><option key={t} value={t}/>)}</datalist>
+                <label>Kurum Türü</label>
+                <select className="form-control" value={form.type} onChange={e=>set('type',e.target.value)}>
+                  <option value="">— Seçin —</option>
+                  {cfg.orgTypes.map(t=><option key={t} value={t}>{t}</option>)}
+                </select>
               </div>
               <div className="form-group">
-                <label>Sektör <span style={{fontSize:11,color:'var(--gray-400)',fontWeight:400}}>(listeden seçin veya yazın)</span></label>
-                <input className="form-control" list="org-sectors-list" value={form.sector} onChange={e=>set('sector',e.target.value)} placeholder="Teknoloji, Sağlık, Enerji…"/>
-                <datalist id="org-sectors-list">{cfg.sectors.map(s=><option key={s} value={s}/>)}</datalist>
+                <label>Sektör</label>
+                <select className="form-control" value={form.sector} onChange={e=>set('sector',e.target.value)}>
+                  <option value="">— Seçin —</option>
+                  {cfg.sectors.map(s=><option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
               <div className="form-group"><label>Ülke</label><input className="form-control" value={form.country} onChange={e=>set('country',e.target.value)} placeholder="Örn. Almanya, ABD"/></div>
               <div className="form-group"><label>Şehir</label><input className="form-control" value={form.city} onChange={e=>set('city',e.target.value)} placeholder="Şehir"/></div>
