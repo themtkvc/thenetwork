@@ -390,3 +390,63 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   .info-grid { grid-template-columns: 1fr; }
   .modal-body { padding: 16px; }
 }
+
+/* ─── Quick org create / link picker ─── */
+.quick-org-form {
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: #f0f7ff;
+  border: 1px solid var(--blue-light);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-outline-add {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fff;
+  color: var(--blue);
+  border: 1.5px dashed var(--blue-light);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-outline-add:hover {
+  background: #eff6ff;
+  border-color: var(--blue);
+}
+
+.link-picker {
+  margin: 10px 0;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.link-picker-row {
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.link-picker-row:hover {
+  background: #eff6ff;
+  border-color: var(--blue-light);
+}
+.link-picker-row:hover .link-picker-add {
+  opacity: 1;
+}
+
+.link-picker-add {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue);
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}

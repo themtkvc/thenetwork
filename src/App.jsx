@@ -244,8 +244,12 @@ function EmptyState({ type }) {
 }
 
 /* ─── FormModal (contact) ─── */
-function FormModal({ isOpen, editContact, orgs, onClose, onSave }) {
+function FormModal({ isOpen, editContact, orgs, onClose, onSave, onQuickCreateOrg, defaultOrgId }) {
   const [form, setForm] = useState(emptyForm())
+  const [showQuickOrg, setShowQuickOrg] = useState(false)
+  const [quickOrgName, setQuickOrgName] = useState('')
+  const [quickOrgType, setQuickOrgType] = useState('')
+
   useEffect(() => {
     if (editContact) {
       setForm({
@@ -261,9 +265,12 @@ function FormModal({ isOpen, editContact, orgs, onClose, onSave }) {
         orgId: editContact.orgId||''
       })
     } else {
-      setForm(emptyForm())
+      setForm({...emptyForm(), orgId: defaultOrgId||''})
     }
-  }, [editContact, isOpen])
+    setShowQuickOrg(false)
+    setQuickOrgName('')
+    setQuickOrgType('')
+  }, [editContact, isOpen, defaultOrgId])
 
   useEffect(() => {
     const handleKey = e => { if (e.key === 'Escape') onClose() }
@@ -302,19 +309,51 @@ function FormModal({ isOpen, editContact, orgs, onClose, onSave }) {
             </div>
           </div>
 
-          {orgs.length > 0 && (
-            <div className="form-section">
-              <div className="form-section-title">🏛 Kurum Bağlantısı</div>
-              <div className="form-group">
-                <label>Kayıtlı Kurumla Eşleştir</label>
+          <div className="form-section">
+            <div className="form-section-title">🏛 Kurum Bağlantısı</div>
+            <div className="form-group">
+              <label>Kayıtlı Kurumla Eşleştir</label>
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
                 <select className="form-control" value={form.orgId} onChange={e=>set('orgId',e.target.value)}>
                   <option value="">— Kurum seçin (opsiyonel) —</option>
                   {orgs.map(o=><option key={o.id} value={o.id}>{o.name}{o.type ? ` · ${o.type}` : ''}</option>)}
                 </select>
-                <span style={{fontSize:11.5,color:'var(--gray-400)',marginTop:3}}>Kurum kaydıyla bağlantı kurarak detay sayfalarında çift yönlü erişim sağlayın.</span>
+                <button type="button" className="btn btn-sm btn-outline-add" onClick={()=>setShowQuickOrg(v=>!v)} title="Yeni kurum oluştur" style={{flexShrink:0}}>
+                  ＋ Yeni Kurum
+                </button>
               </div>
+              {showQuickOrg && (
+                <div className="quick-org-form">
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                    <input
+                      className="form-control"
+                      style={{flex:'1 1 180px'}}
+                      value={quickOrgName}
+                      onChange={e=>setQuickOrgName(e.target.value)}
+                      placeholder="Kurum adı *"
+                      autoFocus
+                    />
+                    <select className="form-control" style={{flex:'1 1 140px'}} value={quickOrgType} onChange={e=>setQuickOrgType(e.target.value)}>
+                      <option value="">Tür (opsiyonel)</option>
+                      {ORG_TYPES.map(t=><option key={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div style={{display:'flex',gap:6,marginTop:6}}>
+                    <button type="button" className="btn btn-sm btn-primary" onClick={()=>{
+                      if (!quickOrgName.trim()) return
+                      const newOrg = onQuickCreateOrg(quickOrgName.trim(), quickOrgType)
+                      set('orgId', newOrg.id)
+                      setShowQuickOrg(false)
+                      setQuickOrgName('')
+                      setQuickOrgType('')
+                    }}>✓ Oluştur ve Seç</button>
+                    <button type="button" className="btn btn-sm btn-secondary" onClick={()=>{setShowQuickOrg(false);setQuickOrgName('');setQuickOrgType('')}}>İptal</button>
+                  </div>
+                </div>
+              )}
+              {!showQuickOrg && <span style={{fontSize:11.5,color:'var(--gray-400)',marginTop:3,display:'block'}}>Kurum kaydıyla bağlantı kurarak detay sayfalarında çift yönlü erişim sağlayın.</span>}
             </div>
-          )}
+          </div>
 
           <div className="form-section">
             <div className="form-section-title">🏷️ Kategori & Etiketler</div>
@@ -588,14 +627,30 @@ function DetailModal({ isOpen, contact, orgs, onClose, onEdit, onAddComm, onDele
 }
 
 /* ─── OrgDetailModal ─── */
-function OrgDetailModal({ isOpen, org, contacts, onClose, onEdit, onOpenContact }) {
+function OrgDetailModal({ isOpen, org, contacts, allContacts, onClose, onEdit, onOpenContact, onNewContact, onLinkContact }) {
+  const [showLinkPicker, setShowLinkPicker] = useState(false)
+  const [linkSearch, setLinkSearch] = useState('')
+
   useEffect(() => {
     const handleKey = e => { if (e.key === 'Escape') onClose() }
     if (isOpen) window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [isOpen, onClose])
+
+  useEffect(() => {
+    if (!isOpen) { setShowLinkPicker(false); setLinkSearch('') }
+  }, [isOpen])
+
   if (!isOpen || !org) return null
   const linked = contacts.filter(c => c.orgId === org.id)
+  const unlinked = (allContacts||contacts).filter(c => !c.orgId || c.orgId === '')
+  const filteredUnlinked = unlinked.filter(c => {
+    const q = linkSearch.toLowerCase()
+    return !q || `${c.firstName} ${c.lastName}`.toLowerCase().includes(q)
+      || (c.company||'').toLowerCase().includes(q)
+      || (c.position||'').toLowerCase().includes(q)
+  })
+
   return (
     <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
@@ -630,9 +685,49 @@ function OrgDetailModal({ isOpen, org, contacts, onClose, onEdit, onOpenContact 
             </div>
           )}
           <div className="detail-section">
-            <div className="detail-section-title">👥 Bağlı Kişiler ({linked.length})</div>
-            {linked.length === 0 ? (
-              <p style={{fontSize:13,color:'var(--gray-400)'}}>Bu kuruma bağlı kişi yok. Kişi eklerken bu kurumu seçerek bağlantı kurabilirsiniz.</p>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div className="detail-section-title" style={{marginBottom:0}}>👥 Bağlı Kişiler ({linked.length})</div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-sm btn-outline-add" onClick={()=>{setShowLinkPicker(v=>!v);setLinkSearch('')}}>
+                  🔗 Mevcut Kişiyi Bağla
+                </button>
+                <button className="btn btn-sm btn-primary" onClick={()=>{onClose();onNewContact(org.id)}}>
+                  ＋ Yeni Kişi Ekle
+                </button>
+              </div>
+            </div>
+
+            {showLinkPicker && (
+              <div className="link-picker">
+                <div style={{fontWeight:600,fontSize:12,color:'var(--gray-500)',marginBottom:6}}>
+                  Henüz bir kuruma bağlı olmayan kişilerden seçin:
+                </div>
+                <input
+                  className="form-control"
+                  style={{marginBottom:8}}
+                  placeholder="İsim veya şirket ara…"
+                  value={linkSearch}
+                  onChange={e=>setLinkSearch(e.target.value)}
+                  autoFocus
+                />
+                {filteredUnlinked.length === 0
+                  ? <p style={{fontSize:12,color:'var(--gray-400)',margin:0}}>Bağlanabilecek kişi bulunamadı.</p>
+                  : filteredUnlinked.map(c => (
+                    <div key={c.id} className="linked-contact-item link-picker-row" onClick={()=>{onLinkContact(c.id,org.id);setShowLinkPicker(false);setLinkSearch('')}}>
+                      <div className="avatar" style={{width:32,height:32,fontSize:12,flexShrink:0}}>{(c.firstName?.[0]||'')+(c.lastName?.[0]||'')}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:600,fontSize:13}}>{c.firstName} {c.lastName}</div>
+                        {(c.position||c.company) && <div style={{fontSize:11,color:'var(--gray-500)'}}>{c.position}{c.position&&c.company?' · ':''}{c.company}</div>}
+                      </div>
+                      <span className="link-picker-add">Bağla ＋</span>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+
+            {linked.length === 0 && !showLinkPicker ? (
+              <p style={{fontSize:13,color:'var(--gray-400)'}}>Bu kuruma bağlı kişi yok. Yukarıdaki butonlarla kişi ekleyin veya mevcut kişiyi bağlayın.</p>
             ) : (
               <div className="linked-contacts">
                 {linked.map(c => (
@@ -712,6 +807,8 @@ export default function App() {
   const [editOrgId, setEditOrgId] = useState(null)
   const [detailOrgId, setDetailOrgId] = useState(null)
   const [deleteOrgId, setDeleteOrgId] = useState(null)
+  // pending org id for pre-selecting when opening contact form from org detail
+  const [pendingOrgId, setPendingOrgId] = useState('')
 
   useEffect(() => { saveContacts(contacts) }, [contacts])
   useEffect(() => { saveOrgs(orgs) }, [orgs])
@@ -761,6 +858,27 @@ export default function App() {
     }
     setOrgFormOpen(false)
     setEditOrgId(null)
+  }
+
+  // Quick-create org from inside the contact form (returns the new org object)
+  const handleQuickCreateOrg = (name, type) => {
+    const newOrg = { id: uid(), name, type: type||'', sector:'', country:'', city:'', website:'', phone:'', email:'', notes:'', addedDate: todayStr() }
+    setOrgs(os => [...os, newOrg])
+    return newOrg
+  }
+
+  // Open contact form with a pre-selected org (called from OrgDetailModal)
+  const handleNewContactForOrg = (orgId) => {
+    setDetailOrgId(null)
+    setPendingOrgId(orgId)
+    setEditId(null)
+    setFormOpen(true)
+    setActiveTab('contacts')
+  }
+
+  // Link an existing contact to an org
+  const handleLinkContact = (contactId, orgId) => {
+    setContacts(cs => cs.map(c => c.id === contactId ? {...c, orgId} : c))
   }
 
   const handleAddComm = (contactId, comm) => {
@@ -950,10 +1068,28 @@ export default function App() {
         </>
       )}
 
-      <FormModal isOpen={formOpen} editContact={editContact} orgs={orgs} onClose={()=>{setFormOpen(false);setEditId(null)}} onSave={handleSave}/>
+      <FormModal
+        isOpen={formOpen}
+        editContact={editContact}
+        orgs={orgs}
+        defaultOrgId={pendingOrgId}
+        onClose={()=>{setFormOpen(false);setEditId(null);setPendingOrgId('')}}
+        onSave={(data)=>{handleSave(data);setPendingOrgId('')}}
+        onQuickCreateOrg={handleQuickCreateOrg}
+      />
       <OrgFormModal isOpen={orgFormOpen} editOrg={editOrg} onClose={()=>{setOrgFormOpen(false);setEditOrgId(null)}} onSave={handleSaveOrg}/>
       <DetailModal isOpen={!!detailId} contact={detailContact} orgs={orgs} onClose={()=>setDetailId(null)} onEdit={id=>{setEditId(id);setFormOpen(true)}} onAddComm={handleAddComm} onDeleteComm={handleDeleteComm} onOpenOrg={openOrg}/>
-      <OrgDetailModal isOpen={!!detailOrgId} org={detailOrg} contacts={contacts} onClose={()=>setDetailOrgId(null)} onEdit={id=>{setEditOrgId(id);setOrgFormOpen(true)}} onOpenContact={openContact}/>
+      <OrgDetailModal
+        isOpen={!!detailOrgId}
+        org={detailOrg}
+        contacts={contacts}
+        allContacts={contacts}
+        onClose={()=>setDetailOrgId(null)}
+        onEdit={id=>{setEditOrgId(id);setOrgFormOpen(true)}}
+        onOpenContact={openContact}
+        onNewContact={handleNewContactForOrg}
+        onLinkContact={handleLinkContact}
+      />
       <DeleteModal isOpen={!!deleteId} name={deleteContact ? `${deleteContact.firstName} ${deleteContact.lastName}` : ''} onClose={()=>setDeleteId(null)} onConfirm={handleDelete}/>
       <DeleteModal isOpen={!!deleteOrgId} name={deleteOrg?.name||''} message={deleteOrg ? `"${deleteOrg.name}" kurumunu silmek istediğinize emin misiniz? Bu kuruma bağlı kişilerin bağlantısı kaldırılacak, ancak kişiler silinmeyecek.` : ''} onClose={()=>setDeleteOrgId(null)} onConfirm={handleDeleteOrg}/>
     </>
